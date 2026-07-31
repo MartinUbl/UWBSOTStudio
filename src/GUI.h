@@ -41,6 +41,7 @@ class CStudio_GUI {
 		void Restore_Plugin_Defaults();
 
 		void Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size);
+		void Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size);
 
 	private:
 		GLFWwindow* mWindow = nullptr;
@@ -65,4 +66,9 @@ class CStudio_GUI {
 
 		float mArena_Width = 0.0f;
 		float mArena_Height = 0.0f;
+
+		float mArena3D_View_Rotation = 45.0f;
+		float mArena3D_View_Elevation = 35.264f;
+		float mArena3D_View_Zoom = 1.0f;
+		ImVec2 mArena3D_View_Pan = ImVec2(0.0f, 0.0f);
 };
