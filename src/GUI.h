@@ -11,6 +11,12 @@
 
 using TClock = std::chrono::steady_clock;
 
+struct TImGui_Texture {
+	unsigned int texture_id = 0;
+	int width = 0;
+	int height = 0;
+};
+
 struct GLFWwindow;
 
 class CStudio_GUI {
@@ -42,6 +48,9 @@ class CStudio_GUI {
 
 		void Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size);
 		void Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size);
+		void Draw_Camera_View(ImVec2 cursorPos, ImVec2 size);
+
+		bool Update_Camera_Texture(const void* rgbaPixels, int width, int height);
 
 	private:
 		GLFWwindow* mWindow = nullptr;
@@ -73,4 +82,7 @@ class CStudio_GUI {
 		ImVec2 mArena3D_View_Pan = ImVec2(0.0f, 0.0f);
 		bool mArena3D_Is_Rotating = false;
 		bool mArena3D_Is_Panning = false;
+
+		void* mCamera_Buffer = nullptr;
+		TImGui_Texture mCamera_Texture;
 };

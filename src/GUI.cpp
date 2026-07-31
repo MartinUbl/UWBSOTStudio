@@ -15,6 +15,10 @@
 
 #include <array>
 
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
 #ifndef GL_CURRENT_PROGRAM
 #define GL_CURRENT_PROGRAM 0x8B8D
 #endif
@@ -565,6 +569,23 @@ void CStudio_GUI::Draw_Main_Content()
 			mRobot_Positions.assign(pos, pos + pcnt);
 
 			delete[] pos;
+
+			int camW = mCamera_Texture.width, camH = mCamera_Texture.height;
+
+			if (mCamera_Texture.width == 0 || mCamera_Texture.height == 0 || mCamera_Buffer == nullptr) {
+				// Initialize camera texture dimensions
+				auto res = mSensing_Plugin_Instance->Get_Camera_Image(nullptr, &camW, &camH);
+				if (res == NLib_Result::Success) {
+					mCamera_Buffer = new uint8_t[camW * camH * 4]; // Assuming RGBA
+				}
+			}
+
+			if (mCamera_Buffer != nullptr) {
+				auto res = mSensing_Plugin_Instance->Get_Camera_Image(mCamera_Buffer, &camW, &camH);
+				if (res == NLib_Result::Success) {
+					Update_Camera_Texture(mCamera_Buffer, camW, camH);
+				}
+			}
 		}
 	}
 
@@ -582,24 +603,26 @@ void CStudio_GUI::Draw_Main_Content()
 			ImGui::EndMenuBar();
 		}
 
-		if (ImGui::BeginTable("Table", 2)) {
-			ImGui::TableSetupColumn("Connection", ImGuiTableColumnFlags_WidthFixed);
-			ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthStretch, 10.0f);
+		const auto windowWidth = ImGui::GetContentRegionAvail().x;
+		const auto sectionWidth = windowWidth / 3.0f;
 
-			ImGui::TableNextColumn();
-			ImGui::Text("Connection status");
-
-			ImGui::TableNextColumn();
-			ImGui::Text("Field view");
-
-			ImGui::EndTable();
-		}
-
+		auto baseX = ImGui::GetCursorPosX();
 		auto curPosY = ImGui::GetCursorPosY();
 
-		Draw_Scaled_TopDown_Arena(ImVec2(ImGui::GetCursorPosX(), curPosY + 50), ImVec2(600, 600));
-		Draw_3D_Arena(ImVec2(ImGui::GetCursorPosX() + 600, curPosY + 50), ImVec2(600, 600));
-		ImGui::SetCursorPosY(curPosY + 600);
+		ImGui::Text("Top-Down view");
+		Draw_Scaled_TopDown_Arena(ImVec2(baseX, curPosY + 50), ImVec2(sectionWidth, 600));
+		ImGui::SetCursorPosX(baseX + sectionWidth);
+		ImGui::SetCursorPosY(curPosY);
+
+		ImGui::Text("3D view");
+		Draw_3D_Arena(ImVec2(baseX + sectionWidth, curPosY + 50), ImVec2(sectionWidth, 600));
+		ImGui::SetCursorPosX(baseX + 2 * sectionWidth);
+		ImGui::SetCursorPosY(curPosY);
+
+		ImGui::Text("Camera view");
+		Draw_Camera_View(ImVec2(baseX + 2 * sectionWidth, curPosY + 50), ImVec2(sectionWidth, 600));
+		ImGui::SetCursorPosX(baseX);
+		ImGui::SetCursorPosY(curPosY + 600 + 24);
 
 		if (ImGui::Button("Test")) {
 			mControl_Plugin_Instance->Set_Robot_Speed(0, 0, 0.05f, 0.95f);
@@ -615,6 +638,7 @@ void CStudio_GUI::Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size) {
 	ImVec2 adjustedSize = ImVec2(size.x - 2 * Display_Margin, size.y - 2 * Display_Margin);
 
 	ImGui::GetWindowDrawList()->AddRectFilled(cursorPos, ImVec2(cursorPos.x + size.x, cursorPos.y + size.y), IM_COL32(0, 0, 32, 255));
+	ImGui::GetWindowDrawList()->AddRect(cursorPos, ImVec2(cursorPos.x + size.x, cursorPos.y + size.y), IM_COL32(0, 0, 128, 180), 0.0f, 0, 2.0f);
 
 	float factorX = adjustedSize.x / static_cast<float>(mArena_Width);
 	float factorY = adjustedSize.y / static_cast<float>(mArena_Height);
@@ -1125,7 +1149,159 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		previous_multisample ? glEnable(GL_MULTISAMPLE) : glDisable(GL_MULTISAMPLE);
 	}, &render_data);
 	draw_list->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
-	draw_list->AddRect(rect_min, rect_max, IM_COL32(255, 255, 255, 180), 0.0f, 0, 2.0f);
+
+	draw_list->AddRect(rect_min, rect_max, IM_COL32(0, 0, 128, 180), 0.0f, 0, 2.0f);
+}
+
+void CStudio_GUI::Draw_Camera_View(ImVec2 startPosition, ImVec2 canvasSize) {
+	if (canvasSize.x <= 0.0f || canvasSize.y <= 0.0f)
+		return;
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+	const ImVec2 canvasEnd(
+		startPosition.x + canvasSize.x,
+		startPosition.y + canvasSize.y
+	);
+
+	// Optional background.
+	drawList->AddRectFilled(
+		startPosition,
+		canvasEnd,
+		IM_COL32(0, 0, 32, 255)
+	);
+
+	drawList->AddRect(startPosition, canvasEnd, IM_COL32(0, 0, 128, 180), 0.0f, 0, 2.0f);
+
+	if (mCamera_Texture.texture_id == 0 ||
+		mCamera_Texture.width <= 0 ||
+		mCamera_Texture.height <= 0)
+	{
+		return;
+	}
+
+	const float imageAspect =
+		static_cast<float>(mCamera_Texture.width) /
+		static_cast<float>(mCamera_Texture.height);
+
+	const float canvasAspect =
+		canvasSize.x / canvasSize.y;
+
+	ImVec2 imageSize;
+
+	if (imageAspect > canvasAspect)
+	{
+		imageSize.x = canvasSize.x;
+		imageSize.y = canvasSize.x / imageAspect;
+	}
+	else
+	{
+		imageSize.y = canvasSize.y;
+		imageSize.x = canvasSize.y * imageAspect;
+	}
+
+	const ImVec2 imageStart(
+		startPosition.x + (canvasSize.x - imageSize.x) * 0.5f,
+		startPosition.y + (canvasSize.y - imageSize.y) * 0.5f
+	);
+
+	const ImVec2 imageEnd(
+		imageStart.x + imageSize.x,
+		imageStart.y + imageSize.y
+	);
+
+	drawList->AddImage(
+		static_cast<ImTextureID>(
+			static_cast<intptr_t>(mCamera_Texture.texture_id)
+			),
+		imageStart,
+		imageEnd,
+		ImVec2(0.0f, 0.0f),
+		ImVec2(1.0f, 1.0f),
+		IM_COL32(255, 255, 255, 255)
+	);
+}
+
+bool CStudio_GUI::Update_Camera_Texture(const void* rgbaPixels, int width, int height) {
+	if (rgbaPixels == nullptr || width <= 0 || height <= 0)
+		return false;
+
+	if (mCamera_Texture.texture_id == 0)
+	{
+		glGenTextures(1, &mCamera_Texture.texture_id);
+
+		glBindTexture(GL_TEXTURE_2D, mCamera_Texture.texture_id);
+
+		glTexParameteri(
+			GL_TEXTURE_2D,
+			GL_TEXTURE_MIN_FILTER,
+			GL_LINEAR
+		);
+
+		glTexParameteri(
+			GL_TEXTURE_2D,
+			GL_TEXTURE_MAG_FILTER,
+			GL_LINEAR
+		);
+
+		glTexParameteri(
+			GL_TEXTURE_2D,
+			GL_TEXTURE_WRAP_S,
+			GL_CLAMP_TO_EDGE
+		);
+
+		glTexParameteri(
+			GL_TEXTURE_2D,
+			GL_TEXTURE_WRAP_T,
+			GL_CLAMP_TO_EDGE
+		);
+	}
+	else
+	{
+		glBindTexture(GL_TEXTURE_2D, mCamera_Texture.texture_id);
+	}
+
+	// RGBA8 has four bytes per pixel, so alignment 4 would normally work.
+	// Alignment 1 is safe for all row widths.
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	if (mCamera_Texture.width != width || mCamera_Texture.height != height)
+	{
+		mCamera_Texture.width = width;
+		mCamera_Texture.height = height;
+
+		// Allocate or reallocate storage when dimensions change.
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			GL_RGBA8,
+			width,
+			height,
+			0,
+			GL_RGBA,
+			GL_UNSIGNED_BYTE,
+			rgbaPixels
+		);
+	}
+	else
+	{
+		// Reuse existing texture storage for normal video frames.
+		glTexSubImage2D(
+			GL_TEXTURE_2D,
+			0,
+			0,
+			0,
+			width,
+			height,
+			GL_RGBA,
+			GL_UNSIGNED_BYTE,
+			rgbaPixels
+		);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return true;
 }
 
 void CStudio_GUI::Store_Plugin_Defaults()

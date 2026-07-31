@@ -154,13 +154,73 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** position
 	*positions_count = response->robot_count;
 	*positions = new TRobot_Position[*positions_count];
 
+	mCached_Robot_Positions.clear();
 	for (uint16_t i = 0; i < *positions_count; ++i) {
 		(*positions)[i].robot_idx = response->positions[i].robot_idx;
 		(*positions)[i].x = response->positions[i].x;
 		(*positions)[i].y = response->positions[i].y;
 		(*positions)[i].orientation = response->positions[i].orientation;
 		(*positions)[i].team_idx = response->positions[i].team_idx;
+		mCached_Robot_Positions.push_back({response->positions[i].x, response->positions[i].y, response->positions[i].team_idx});
 	}
 
+	return NLib_Result::Success;
+}
+
+NLib_Result CVSOT_Sensing_Plugin::Get_Camera_Image(void* rgbaPixels, int* width, int* height) {
+	if (rgbaPixels == nullptr) {
+		*width = 120;
+		*height = 100;
+		return NLib_Result::Success;
+	}
+
+	// check for fit
+	if (*width * *height < 120 * 100) {
+		return NLib_Result::Invalid_Parameters;
+	}
+
+	// fill the image black
+	for (int y = 0; y < 100; ++y) {
+		for (int x = 0; x < 120; ++x) {
+			uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (y * 120 + x) * 4;
+			pixel[0] = 0; // R
+			pixel[1] = 0; // G
+			pixel[2] = 0; // B
+			pixel[3] = 255; // A
+		}
+	}
+
+	// set the width and height
+	*width = 120;
+	*height = 100;
+
+	// draw a pixel for each robot position
+	for (const auto& pos : mCached_Robot_Positions) {
+		int x = static_cast<int>(pos.x / 220.0f * 120.0f);
+		int y = static_cast<int>(pos.y / 180.0f * 100.0f);
+		if (x < 0 || x >= 120 || y < 0 || y >= 100) {
+			continue;
+		}
+
+		const int nbh = 2;
+
+		// fill the pixel and 1 more sorrounding pixels to make it more visible
+		for (int dy = -nbh; dy <= nbh; ++dy) {
+			for (int dx = -nbh; dx <= nbh; ++dx) {
+				int px = x + dx;
+				int py = y + dy;
+				if (px < 0 || px >= 120 || py < 0 || py >= 100) {
+					continue;
+				}
+				uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (py * 120 + px) * 4;
+				pixel[0] = 255; // R
+				pixel[1] = 0;   // G
+				pixel[2] = 0;   // B
+				pixel[3] = 255; // A
+			}
+		}
+	}
+
+	// return success
 	return NLib_Result::Success;
 }

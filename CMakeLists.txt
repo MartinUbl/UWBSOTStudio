@@ -37,6 +37,8 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glfw imgui)
 
+FIND_PACKAGE(OpenGL REQUIRED)
+
 FILE(GLOB imgui_src "${imgui_SOURCE_DIR}/*.cpp" "${imgui_SOURCE_DIR}/*.h" "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp" "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.h" "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp" "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.h" "${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib*")
 
 INCLUDE_DIRECTORIES("${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends/" "${glfw_SOURCE_DIR}/include")
@@ -55,7 +57,7 @@ ADD_LIBRARY(imgui STATIC ${imgui_src})
 
 ADD_EXECUTABLE(UWBSOTStudio ${src} ${src_shared})
 
-TARGET_LINK_LIBRARIES(UWBSOTStudio imgui glfw opengl32)
+TARGET_LINK_LIBRARIES(UWBSOTStudio imgui glfw OpenGL::GL)
 
 CONFIGURE_MAIN_EXECUTABLE(UWBSOTStudio)
 

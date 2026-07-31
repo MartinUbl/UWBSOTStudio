@@ -14,6 +14,7 @@
 
 enum class NLib_Result : uint32_t {
 	Success,
+	Unsupported,
 
 	Invalid_Parameters,
 	Illegal_State,
@@ -135,6 +136,13 @@ class ISensing_Plugin : public IPlugin {
 		 * The team_idx can be Team_Idx_Any to retrieve all robots, or a specific team index to retrieve only that team's robots.
 		 */
 		virtual NLib_Result Get_Robot_Positions(TRobot_Position** positions, uint16_t* positions_count, uint16_t team_idx = Team_Idx_Any) = 0;
+
+		/**
+		 * Retrieves the camera image from the sensing plugin.
+		 * If rgbaPixels is nullptr, only width and height will be set to the dimensions of the image
+		 * The caller is responsible for allocating and freeing the memory for rgbaPixels. The image is returned in RGBA format, with 4 bytes per pixel.
+		 */
+		virtual NLib_Result Get_Camera_Image(void* rgbaPixels, int* width, int* height) { return NLib_Result::Unsupported; }
 };
 
 class IControl_Plugin : public IPlugin {
