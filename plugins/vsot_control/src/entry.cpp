@@ -23,7 +23,7 @@ namespace vsot_control {
 	TPlugin_Descriptor descriptor = {
 		.id = "vsot_control_plugin",
 		.name = "VSOT Control Plugin",
-		.description = "Virtual SOT (VSOT) control plugin",
+		.description = "Virtual SOT (VSOT) control plugin. This plugin connects to the virtual SOT environment and provides control functionality on robots defined within this environment.",
 		.type = NPlugin_Type::Control,
 		.parameter_count = config_parameter_count,
 		.config_parameters = config_parameters,

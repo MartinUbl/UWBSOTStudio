@@ -26,7 +26,7 @@ namespace vsot_sensing {
 	TPlugin_Descriptor descriptor = {
 		.id = "vsot_sensing_plugin",
 		.name = "VSOT Sensing Plugin",
-		.description = "Virtual SOT (VSOT) sensing plugin",
+		.description = "Virtual SOT (VSOT) sensing plugin. This plugin connects to the virtual SOT environment and provides sensing functionality on robots defined within this environment. It also provides dummy camera stream.",
 		.type = NPlugin_Type::Sensing,
 		.parameter_count = config_parameter_count,
 		.config_parameters = config_parameters,

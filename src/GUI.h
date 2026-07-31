@@ -17,41 +17,15 @@ struct TImGui_Texture {
 	int height = 0;
 };
 
+constexpr auto Row_BG_Color = IM_COL32(50, 50, 50, 255);
+constexpr auto Header_BG_Color = IM_COL32(0, 0, 32, 255);
+constexpr auto Highlight_Color = IM_COL32(224, 177, 0, 255);
+
+extern std::vector<ImVec4> gTeam_Colors;
+
 struct GLFWwindow;
 
 class CStudio_GUI {
-	public:
-		CStudio_GUI(
-			GLFWwindow* window,
-			std::vector<TPlugin_Descriptor_Internal> sensing_plugins,
-			std::vector<TPlugin_Descriptor_Internal> control_plugins);
-
-		static void Configure_ImGui();
-
-		void Draw();
-
-	private:
-		void Draw_Title_Bar();
-		void Draw_Configuration();
-		void Draw_Module_Configuration(
-			const std::string& title,
-			const std::string& combo_id,
-			const std::string& details_table_id,
-			const std::string& input_prefix,
-			const std::vector<TPlugin_Descriptor_Internal>& plugins,
-			int& selected_plugin_index,
-			std::vector<std::string>& parameter_values);
-		void Draw_Main_Content();
-
-		void Store_Plugin_Defaults();
-		void Restore_Plugin_Defaults();
-
-		void Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size);
-		void Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size);
-		void Draw_Camera_View(ImVec2 cursorPos, ImVec2 size);
-
-		bool Update_Camera_Texture(const void* rgbaPixels, int width, int height);
-
 	private:
 		GLFWwindow* mWindow = nullptr;
 		bool mIs_Configured = false;
@@ -85,4 +59,27 @@ class CStudio_GUI {
 
 		void* mCamera_Buffer = nullptr;
 		TImGui_Texture mCamera_Texture;
+
+	public:
+		CStudio_GUI(GLFWwindow* window, std::vector<TPlugin_Descriptor_Internal> sensing_plugins, std::vector<TPlugin_Descriptor_Internal> control_plugins);
+
+		static void Configure_ImGui();
+
+		void Draw();
+
+	private:
+		void Frame_Configuration();
+		void Frame_Dashboard();
+
+		void Draw_Title_Bar();
+		void Draw_Module_Configuration(const std::string& title, const std::string& combo_id, const std::string& details_table_id, const std::string& input_prefix, const std::vector<TPlugin_Descriptor_Internal>& plugins, int& selected_plugin_index, std::vector<std::string>& parameter_values);
+
+		void Store_Plugin_Defaults();
+		void Restore_Plugin_Defaults();
+
+		void Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size);
+		void Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size);
+		void Draw_Camera_View(ImVec2 cursorPos, ImVec2 size);
+
+		bool Update_Camera_Texture(const void* rgbaPixels, int width, int height);
 };
