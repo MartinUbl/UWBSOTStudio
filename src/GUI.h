@@ -71,4 +71,6 @@ class CStudio_GUI {
 		float mArena3D_View_Elevation = 35.264f;
 		float mArena3D_View_Zoom = 1.0f;
 		ImVec2 mArena3D_View_Pan = ImVec2(0.0f, 0.0f);
+		bool mArena3D_Is_Rotating = false;
+		bool mArena3D_Is_Panning = false;
 };

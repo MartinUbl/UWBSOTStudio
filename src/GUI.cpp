@@ -18,6 +18,9 @@
 #ifndef GL_CURRENT_PROGRAM
 #define GL_CURRENT_PROGRAM 0x8B8D
 #endif
+#ifndef GL_MULTISAMPLE
+#define GL_MULTISAMPLE 0x809D
+#endif
 
 namespace {
 	constexpr int WINDOW_MIN_WIDTH = 1024;
@@ -677,6 +680,124 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		return;
 	}
 
+	auto get_camera_view_size = [&]() {
+		struct Vec3 {
+			float x;
+			float y;
+			float z;
+		};
+
+		auto dot = [](Vec3 lhs, Vec3 rhs) {
+			return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+		};
+
+		constexpr float Deg_Per_Rad = 57.29577951308232f;
+		const float rotation = mArena3D_View_Rotation / Deg_Per_Rad;
+		const float elevation = mArena3D_View_Elevation / Deg_Per_Rad;
+		const float cos_rotation = std::cos(rotation);
+		const float sin_rotation = std::sin(rotation);
+		const float cos_elevation = std::cos(elevation);
+		const float sin_elevation = std::sin(elevation);
+		const Vec3 camera_right{
+			cos_rotation,
+			-sin_rotation,
+			0.0f,
+		};
+		const Vec3 camera_up{
+			-sin_rotation * sin_elevation,
+			-cos_rotation * sin_elevation,
+			cos_elevation,
+		};
+		const Vec3 camera_depth{
+			-(camera_right.y * camera_up.z - camera_right.z * camera_up.y),
+			-(camera_right.z * camera_up.x - camera_right.x * camera_up.z),
+			-(camera_right.x * camera_up.y - camera_right.y * camera_up.x),
+		};
+		const Vec3 scene_center{
+			mArena_Width * 0.5f,
+			mArena_Height * 0.5f,
+			0.0f,
+		};
+
+		auto transform_to_camera = [&](Vec3 point) {
+			point.x -= scene_center.x;
+			point.y -= scene_center.y;
+			point.z -= scene_center.z;
+			return Vec3{
+				dot(camera_right, point),
+				dot(camera_up, point),
+				dot(camera_depth, point),
+			};
+		};
+
+		Vec3 view_min{ FLT_MAX, FLT_MAX, FLT_MAX };
+		Vec3 view_max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		for (const float x : { -Margin_Size, mArena_Width + Margin_Size }) {
+			for (const float y : { -Margin_Size, mArena_Height + Margin_Size }) {
+				for (const float z : { 0.0f, Robot_Size }) {
+					const Vec3 projected = transform_to_camera(Vec3{ x, y, z });
+					view_min.x = std::min(view_min.x, projected.x);
+					view_min.y = std::min(view_min.y, projected.y);
+					view_max.x = std::max(view_max.x, projected.x);
+					view_max.y = std::max(view_max.y, projected.y);
+				}
+			}
+		}
+
+		const float view_padding = 24.0f;
+		const float zoom = std::max(0.05f, mArena3D_View_Zoom);
+		const float viewport_width = std::max(1.0f, size.x - Display_Margin * 2.0f);
+		const float viewport_height = std::max(1.0f, size.y - Display_Margin * 2.0f);
+		const float viewport_aspect = viewport_width / viewport_height;
+		float view_width = (view_max.x - view_min.x) + view_padding;
+		float view_height = (view_max.y - view_min.y) + view_padding;
+		if (view_width / view_height > viewport_aspect) {
+			view_height = view_width / viewport_aspect;
+		}
+		else {
+			view_width = view_height * viewport_aspect;
+		}
+
+		return ImVec2(view_width / zoom, view_height / zoom);
+	};
+
+	ImGuiIO& io = ImGui::GetIO();
+	const bool is_hovered = ImGui::IsMouseHoveringRect(rect_min, rect_max, true);
+	if (is_hovered && io.MouseWheel != 0.0f) {
+		const float zoom_factor = std::pow(1.12f, io.MouseWheel);
+		mArena3D_View_Zoom = std::clamp(mArena3D_View_Zoom * zoom_factor, 0.2f, 8.0f);
+	}
+
+	if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+		mArena3D_Is_Rotating = true;
+	}
+	if (is_hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Middle))) {
+		mArena3D_Is_Panning = true;
+	}
+	if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+		mArena3D_Is_Rotating = false;
+	}
+	if (!ImGui::IsMouseDown(ImGuiMouseButton_Right) && !ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+		mArena3D_Is_Panning = false;
+	}
+
+	if (mArena3D_Is_Rotating) {
+		mArena3D_View_Rotation = std::fmod(mArena3D_View_Rotation - io.MouseDelta.x * 0.35f, 360.0f);
+		if (mArena3D_View_Rotation < 0.0f) {
+			mArena3D_View_Rotation += 360.0f;
+		}
+		mArena3D_View_Elevation = std::clamp(mArena3D_View_Elevation - io.MouseDelta.y * 0.25f, 15.0f, 70.0f);
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+	}
+	else if (mArena3D_Is_Panning) {
+		const ImVec2 camera_view_size = get_camera_view_size();
+		const float viewport_width = std::max(1.0f, size.x - Display_Margin * 2.0f);
+		const float viewport_height = std::max(1.0f, size.y - Display_Margin * 2.0f);
+		mArena3D_View_Pan.x -= io.MouseDelta.x * camera_view_size.x / viewport_width;
+		mArena3D_View_Pan.y += io.MouseDelta.y * camera_view_size.y / viewport_height;
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+	}
+
 	struct TOpenGL_Arena_Render_Data {
 		ImVec2 rect_min;
 		ImVec2 size;
@@ -730,6 +851,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		const GLboolean previous_blend = glIsEnabled(GL_BLEND);
 		const GLboolean previous_cull_face = glIsEnabled(GL_CULL_FACE);
 		const GLboolean previous_texture_2d = glIsEnabled(GL_TEXTURE_2D);
+		const GLboolean previous_multisample = glIsEnabled(GL_MULTISAMPLE);
 		glGetIntegerv(GL_VIEWPORT, previous_viewport);
 		glGetIntegerv(GL_SCISSOR_BOX, previous_scissor_box);
 		glGetIntegerv(GL_MATRIX_MODE, &previous_matrix_mode);
@@ -754,6 +876,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_MULTISAMPLE);
 		glDepthFunc(GL_LEQUAL);
 		glDisable(GL_BLEND);
 		glDisable(GL_CULL_FACE);
@@ -999,6 +1122,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		previous_blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
 		previous_cull_face ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
 		previous_texture_2d ? glEnable(GL_TEXTURE_2D) : glDisable(GL_TEXTURE_2D);
+		previous_multisample ? glEnable(GL_MULTISAMPLE) : glDisable(GL_MULTISAMPLE);
 	}, &render_data);
 	draw_list->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 	draw_list->AddRect(rect_min, rect_max, IM_COL32(255, 255, 255, 180), 0.0f, 0, 2.0f);
