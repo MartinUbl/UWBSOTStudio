@@ -35,9 +35,20 @@ FetchContent_Declare(
   GIT_SHALLOW 1
 )
 
-FetchContent_MakeAvailable(glfw imgui)
+SET(PYBIND11_FINDPYTHON ON)
+
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG        v3.0.3
+    GIT_SHALLOW    TRUE
+)
+
+FetchContent_MakeAvailable(glfw imgui pybind11)
 
 FIND_PACKAGE(OpenGL REQUIRED)
+
+FIND_PACKAGE(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
 
 FILE(GLOB imgui_src "${imgui_SOURCE_DIR}/*.cpp" "${imgui_SOURCE_DIR}/*.h" "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp" "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.h" "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp" "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.h" "${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib*")
 
@@ -57,7 +68,7 @@ ADD_LIBRARY(imgui STATIC ${imgui_src})
 
 ADD_EXECUTABLE(UWBSOTStudio ${src} ${src_shared})
 
-TARGET_LINK_LIBRARIES(UWBSOTStudio imgui glfw OpenGL::GL)
+TARGET_LINK_LIBRARIES(UWBSOTStudio imgui glfw OpenGL::GL pybind11::embed)
 
 CONFIGURE_MAIN_EXECUTABLE(UWBSOTStudio)
 
