@@ -56,6 +56,13 @@ struct TLog_Entry {
 	std::string message;
 };
 
+struct TBall {
+	NBall_State state = NBall_State::Not_Found;
+	float x;
+	float y;
+	float radius;
+};
+
 class CStudio_GUI {
 	private:
 		GLFWwindow* mWindow = nullptr;
@@ -81,6 +88,8 @@ class CStudio_GUI {
 		std::vector<TRobot_Position> mRobot_Positions;
 		std::vector<TRobot_Cached_Info> mRobot_Cached_Info;
 		std::vector<TLog_Entry> mLog_Entries;
+
+		TBall mBall;
 
 		float mArena_Width = 0.0f;
 		float mArena_Height = 0.0f;

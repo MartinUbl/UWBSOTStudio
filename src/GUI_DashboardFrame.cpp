@@ -76,6 +76,8 @@ void CStudio_GUI::Frame_Dashboard()
 
 			delete[] pos;
 
+			mSensing_Plugin_Instance->Get_Ball_Position(&mBall.state, &mBall.x, &mBall.y, &mBall.radius);
+
 			int camW = mCamera_Texture.width, camH = mCamera_Texture.height;
 
 			if (mCamera_Texture.width == 0 || mCamera_Texture.height == 0 || mCamera_Buffer == nullptr) {

@@ -40,6 +40,12 @@ enum class NPlugin_Type : uint16_t {
 	None,
 };
 
+enum class NBall_State : uint8_t {
+	Not_Found,	// the detector did not find the ball in the current frame
+	Ground,		// the ball is on the ground
+	Lifted,		// the ball is visually found, but lifted from the ground
+};
+
 struct TPlugin_Descriptor {
 	const char* id;
 	const char* name;
@@ -136,6 +142,11 @@ class ISensing_Plugin : public IPlugin {
 		 * The team_idx can be Team_Idx_Any to retrieve all robots, or a specific team index to retrieve only that team's robots.
 		 */
 		virtual NLib_Result Get_Robot_Positions(TRobot_Position** positions, uint16_t* positions_count, uint16_t team_idx = Team_Idx_Any) = 0;
+
+		/**
+		 * Retrieves the position and state of the ball. The state indicates whether the ball is on the ground, lifted, or not found.
+		 */
+		virtual NLib_Result Get_Ball_Position(NBall_State* state, float* x, float* y, float* radius) = 0;
 
 		/**
 		 * Retrieves the camera image from the sensing plugin.

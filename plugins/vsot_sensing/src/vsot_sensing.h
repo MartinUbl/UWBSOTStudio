@@ -22,7 +22,7 @@ class CVSOT_Sensing_Plugin : public ISensing_Plugin {
 		std::vector<TCached_Robot_Position> mCached_Robot_Positions;
 
 	protected:
-		bool Send_Metadata_Request(vsot::TMetadata_Response** response) const;
+		bool Send_Metadata_Request(char** response, vsot::NOpcode opcode = vsot::NOpcode::Metadata_Request) const;
 
 	public:
 		// IPlugin iface
@@ -35,5 +35,6 @@ class CVSOT_Sensing_Plugin : public ISensing_Plugin {
 		virtual NLib_Result Get_Team_Sizes(uint16_t** sizes, uint16_t* sizes_count) const override;
 		virtual NLib_Result Get_Arena_Size(float* width, float* height) const override;
 		virtual NLib_Result Get_Robot_Positions(TRobot_Position** positions, uint16_t* positions_count, uint16_t team_idx = Team_Idx_Any) override;
+		virtual NLib_Result Get_Ball_Position(NBall_State* state, float* x, float* y, float* radius) override;
 		virtual NLib_Result Get_Camera_Image(void* rgbaPixels, int* width, int* height) override;
 };

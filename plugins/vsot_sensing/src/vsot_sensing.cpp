@@ -57,10 +57,10 @@ const uint64_t CVSOT_Sensing_Plugin::Get_Logical_Clock() const {
 	return 1;
 }
 
-bool CVSOT_Sensing_Plugin::Send_Metadata_Request(vsot::TMetadata_Response** response) const {
+bool CVSOT_Sensing_Plugin::Send_Metadata_Request(char** response, vsot::NOpcode opcode) const {
 	// request metadata from the environment and parse the response to get the number of teams
 	vsot::TMessage<void> request;
-	request.header.opcode = vsot::NOpcode::Metadata_Request;
+	request.header.opcode = opcode;
 	request.header.length = 0;
 
 	int res = send(mSocket, reinterpret_cast<const char*>(&request), sizeof(request), 0);
@@ -80,17 +80,20 @@ bool CVSOT_Sensing_Plugin::Send_Metadata_Request(vsot::TMetadata_Response** resp
 	char* body_copy = new char[body_size];
 	memcpy(body_copy, buffer.data() + sizeof(request), body_size);
 
-	*response = reinterpret_cast<vsot::TMetadata_Response*>(body_copy);
+	*response = body_copy;
 
 	return true;
 }
 
 uint16_t CVSOT_Sensing_Plugin::Get_Team_Count() const {
 
-	vsot::TMetadata_Response* response = nullptr;
-	if (!Send_Metadata_Request(&response)) {
+	char* response_raw = nullptr;
+
+	if (!Send_Metadata_Request(&response_raw)) {
 		return 0;
 	}
+
+	vsot::TMetadata_Response* response = reinterpret_cast<vsot::TMetadata_Response*>(response_raw);
 
 	uint16_t team_count = response->team_count;
 	delete[] reinterpret_cast<char*>(response);
@@ -99,11 +102,14 @@ uint16_t CVSOT_Sensing_Plugin::Get_Team_Count() const {
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Team_Sizes(uint16_t** sizes, uint16_t* sizes_count) const {
 
-	vsot::TMetadata_Response* response = nullptr;
-	if (!Send_Metadata_Request(&response)) {
+	char* response_raw = nullptr;
+
+	if (!Send_Metadata_Request(&response_raw)) {
 		*sizes_count = 0;
 		return NLib_Result::Illegal_State;
 	}
+
+	vsot::TMetadata_Response* response = reinterpret_cast<vsot::TMetadata_Response*>(response_raw);
 
 	*sizes_count = response->team_count;
 
@@ -118,12 +124,15 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Team_Sizes(uint16_t** sizes, uint16_t* siz
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Arena_Size(float* width, float* height) const {
 
-	vsot::TMetadata_Response* response = nullptr;
-	if (!Send_Metadata_Request(&response)) {
+	char* response_raw = nullptr;
+
+	if (!Send_Metadata_Request(&response_raw)) {
 		*width = 0.0f;
 		*height = 0.0f;
 		return NLib_Result::Illegal_State;
 	}
+
+	vsot::TMetadata_Response* response = reinterpret_cast<vsot::TMetadata_Response*>(response_raw);
 
 	*width = response->arena_width;
 	*height = response->arena_height;
@@ -163,6 +172,28 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** position
 		(*positions)[i].team_idx = response->positions[i].team_idx;
 		mCached_Robot_Positions.push_back({response->positions[i].x, response->positions[i].y, response->positions[i].team_idx});
 	}
+
+	return NLib_Result::Success;
+}
+
+NLib_Result CVSOT_Sensing_Plugin::Get_Ball_Position(NBall_State* state, float* x, float* y, float* radius) {
+	char* response_raw = nullptr;
+	if (!Send_Metadata_Request(&response_raw, vsot::NOpcode::Ball_Position_Request)) {
+		*state = NBall_State::Not_Found;
+		*x = 0.0f;
+		*y = 0.0f;
+		*radius = 0.0f;
+		return NLib_Result::Illegal_State;
+	}
+
+	vsot::TBall_Position_Response* response = reinterpret_cast<vsot::TBall_Position_Response*>(response_raw);
+
+	*state = static_cast<NBall_State>(response->state);
+	*x = response->x;
+	*y = response->y;
+	*radius = response->radius;
+
+	delete[] reinterpret_cast<char*>(response);
 
 	return NLib_Result::Success;
 }

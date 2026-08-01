@@ -59,4 +59,8 @@ void CStudio_GUI::Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size) {
 		// draw the robot ID as text
 		ImGui::GetWindowDrawList()->AddText(ImVec2(robotPos.x - 4.0f, robotPos.y - 6.0f), IM_COL32(255, 255, 255, 255), std::to_string(pos.robot_idx).c_str());
 	}
+
+	// draw the ball
+	ImVec2 ballPos(arenaOffset.x + mBall.x * factorX, arenaOffset.y + mBall.y * factorY);
+	ImGui::GetWindowDrawList()->AddCircleFilled(ballPos, mBall.radius * factorX, IM_COL32(255, 255, 255, 255));
 }

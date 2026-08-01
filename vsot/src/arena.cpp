@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <map>
+#include <numbers>
 
 #include <uwbsot/PluginInterface.h>
 
@@ -82,13 +83,78 @@ bool CArena::Start() {
 		Create_Robot_Body(robot);
 	}
 
+	mBall.x = mArgs.arena_width * 0.5f;
+	mBall.y = mArgs.arena_height * 0.5f;
+	mBall.radius = 2.0f;
+	mBall.state = NBall_State::Ground;
+
+	Create_Ball();
+
 	mNetwork->Set_Callbacks({
 		std::bind(&CArena::On_Speed_Set, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4),
 		std::bind(&CArena::On_Refresh_Positions_Request, this, std::placeholders::_1),
-		std::bind(&CArena::On_Metadata_Request, this, std::placeholders::_1)
+		std::bind(&CArena::On_Metadata_Request, this, std::placeholders::_1),
+		std::bind(&CArena::On_Ball_Position_Request, this, std::placeholders::_1)
 	});
 
 	return mNetwork->Start();
+}
+
+void CArena::Create_Ball() {
+	if (mBall.radius <= 0.0f)
+		throw std::invalid_argument("Ball radius must be positive");
+
+	b2BodyDef bodyDef = b2DefaultBodyDef();
+
+	bodyDef.type = b2_dynamicBody;
+	bodyDef.position = b2Vec2(mBall.x, mBall.y);
+
+	// The ball should continue moving after an impact, but gradually slow down.
+	bodyDef.linearDamping = 0.25f;
+	bodyDef.angularDamping = 0.15f;
+
+	// Helps prevent a small, fast ball from passing through thin objects.
+	bodyDef.isBullet = true;
+
+	// Circular objects may rotate quickly.
+	bodyDef.allowFastRotation = true;
+
+	// Keep it available for collisions immediately.
+	bodyDef.enableSleep = true;
+
+	mBall.body_id = b2CreateBody(mWorld_Id, &bodyDef);
+
+	b2ShapeDef shapeDef = b2DefaultShapeDef();
+
+	/*
+	 * Box2D density is kg/m² in a metrically scaled simulation.
+	 *
+	 * A table-tennis ball has a mass of roughly 0.0027 kg. Since Box2D is 2D,
+	 * choose density so that:
+	 *
+	 *     mass = density * pi * radius²
+	 */
+	constexpr float desiredMass = 0.0027f;
+
+	shapeDef.density =
+		desiredMass /
+		(std::numbers::pi * mBall.radius * mBall.radius);
+
+	// Low surface friction: the ball should not stick to robots or walls.
+	shapeDef.material.friction = 0.12f;
+
+	// Moderately bouncy. Increase toward 1.0 for stronger bouncing.
+	shapeDef.material.restitution = 0.65f;
+
+	b2Circle circle{};
+	circle.center = b2Vec2(0.0f, 0.0f);
+	circle.radius = mBall.radius;
+
+	b2CreateCircleShape(
+		mBall.body_id,
+		&shapeDef,
+		&circle
+	);
 }
 
 void CArena::Create_Robot_Body(TArena_Robot& robot) {
@@ -159,6 +225,16 @@ void CArena::Apply_Robot_Command(TArena_Robot& robot)
 	b2Body_SetAngularVelocity(robot.body_id, robot.speed_angular);
 }
 
+void CArena::Synchronize_Ball() {
+	if (!b2Body_IsValid(mBall.body_id))
+		return;
+
+	const b2Vec2 position = b2Body_GetPosition(mBall.body_id);
+
+	mBall.x = position.x;
+	mBall.y = position.y;
+}
+
 void CArena::Synchronize_Robot_State(TArena_Robot& robot)
 {
 	if (!b2Body_IsValid(robot.body_id))
@@ -179,6 +255,7 @@ int CArena::Run() {
 	// Main loop for the arena simulation
 	while (true) {
 		Update_Robot_Positions(0.01f);
+		Synchronize_Ball();
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 	return 0;
@@ -239,7 +316,7 @@ void CArena::On_Refresh_Positions_Request(const TWaiting_For_Positions& request)
 	mNetwork->Send_Refresh_Positions_Response(request, positions);
 }
 
-void CArena::On_Metadata_Request(const TWaiting_For_Metadata& request) {
+void CArena::On_Metadata_Request(const TWaiting_For_Any& request) {
 	std::vector<uint16_t> teamCounts;
 
 	std::map<uint16_t, uint16_t> teamCountMap;
@@ -251,4 +328,8 @@ void CArena::On_Metadata_Request(const TWaiting_For_Metadata& request) {
 	}
 
 	mNetwork->Send_Metadata_Response(request, teamCounts, mArgs.arena_width, mArgs.arena_height);
+}
+
+void CArena::On_Ball_Position_Request(const TWaiting_For_Any& request) {
+	mNetwork->Send_Ball_Position_Response(request, static_cast<uint16_t>(mBall.state), mBall.x, mBall.y, mBall.radius);
 }

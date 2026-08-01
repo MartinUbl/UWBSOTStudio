@@ -36,10 +36,12 @@ namespace vsot {
 		Set_Robot_Speed = 0x0001,
 		Refresh_Positions_Request = 0x0002,
 		Metadata_Request = 0x0003,
+		Ball_Position_Request = 0x0004,
 
 		// Responses from server to client
 		Refresh_Positions_Response = 0x0081,
 		Metadata_Response = 0x0082,
+		Ball_Position_Response = 0x0083,
 	};
 
 	struct TSet_Robot_Speed {
@@ -72,6 +74,13 @@ namespace vsot {
 		float arena_height;
 		uint16_t team_count;
 		uint16_t team_counts[0]; // flexible array member
+	};
+
+	struct TBall_Position_Response {
+		uint16_t state; // NBall_State
+		float x;
+		float y;
+		float radius;
 	};
 
 	struct TMessage_Header {
