@@ -13,6 +13,8 @@
 
 #include "cousine-font.h"
 
+#include <uwbsot/Utils.h>
+
 std::vector<ImVec4> gTeam_Colors = {
 	ImVec4(0.8f, 0.1f, 0.1f, 1.0f), // Team 0: Red
 	ImVec4(0.1f, 0.8f, 0.1f, 1.0f), // Team 1: Green
@@ -338,7 +340,7 @@ void CStudio_GUI::Store_Plugin_Defaults()
 {
 	// store currently selected plugin IDs and parameter values to a configuration file or persistent storage
 
-	std::ofstream config_file("plugin_defaults.cfg");
+	std::ofstream config_file(uwbsot::utils::GetAppDataDirectory("UWBSOTStudio") / "plugin_defaults.txt");
 	if (config_file.is_open()) {
 		config_file << mSensing_Plugins[mSelected_Sensing_Plugin_Index].id << std::endl;
 		config_file << mSensing_Module_Parameters.size() << std::endl;
@@ -357,7 +359,7 @@ void CStudio_GUI::Store_Plugin_Defaults()
 void CStudio_GUI::Restore_Plugin_Defaults()
 {
 	// restore previously stored plugin IDs and parameter values from a configuration file or persistent storage
-	std::ifstream config_file("plugin_defaults.cfg");
+	std::ifstream config_file(uwbsot::utils::GetAppDataDirectory("UWBSOTStudio") / "plugin_defaults.txt");
 	if (config_file.is_open()) {
 		std::string sensing_plugin_id;
 		std::getline(config_file, sensing_plugin_id);
@@ -391,4 +393,21 @@ void CStudio_GUI::Restore_Plugin_Defaults()
 		}
 		config_file.close();
 	}
+}
+
+void CStudio_GUI::Store_Script_Dir() {
+	std::ofstream ofs(uwbsot::utils::GetAppDataDirectory("UWBSOTStudio") / "script_dir.txt");
+	ofs << mScript_Directory.string() << std::endl;
+}
+
+bool CStudio_GUI::Restore_Script_Dir() {
+	std::ifstream ifs(uwbsot::utils::GetAppDataDirectory("UWBSOTStudio") / "script_dir.txt");
+	if (ifs.is_open()) {
+		std::string path;
+		std::getline(ifs, path);
+		mScript_Directory = path;
+		ifs.close();
+		return true;
+	}
+	return false;
 }

@@ -44,7 +44,14 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
-FetchContent_MakeAvailable(glfw imgui pybind11)
+FetchContent_Declare(
+    nfd-extended
+    GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+    GIT_TAG 	  v1.3.0
+    GIT_SHALLOW    TRUE
+)
+
+FetchContent_MakeAvailable(glfw imgui pybind11 nfd-extended)
 
 FIND_PACKAGE(OpenGL REQUIRED)
 
@@ -56,19 +63,21 @@ INCLUDE_DIRECTORIES("${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends/" "${glf
 
 FILE(GLOB_RECURSE src_shared shared/uwbsot/*.cpp shared/uwbsot/*.h shared/uwbsot/*.hpp shared/uwbsot/*.c)
 
-INCLUDE_DIRECTORIES("shared/")
+INCLUDE_DIRECTORIES("shared/" "${nfd-extended_SOURCE_DIR}/src/include")
 
 SOURCE_GROUP(shared FILES ${src_shared})
 
-FILE(GLOB_RECURSE src src/*.cpp src/*.h src/*.hpp src/*.c)
+FILE(GLOB src src/*.cpp src/*.h src/*.hpp src/*.c)
+FILE(GLOB_RECURSE src_python src/PythonEngine/*.cpp src/PythonEngine/*.h src/PythonEngine/*.hpp src/PythonEngine/*.c)
 
 SOURCE_GROUP(src FILES ${src})
+SOURCE_GROUP(src//PythonEngine FILES ${src_python})
 
 ADD_LIBRARY(imgui STATIC ${imgui_src})
 
-ADD_EXECUTABLE(UWBSOTStudio ${src} ${src_shared})
+ADD_EXECUTABLE(UWBSOTStudio ${src} ${src_shared} ${src_python})
 
-TARGET_LINK_LIBRARIES(UWBSOTStudio imgui glfw OpenGL::GL pybind11::embed)
+TARGET_LINK_LIBRARIES(UWBSOTStudio imgui glfw OpenGL::GL pybind11::embed nfd)
 
 CONFIGURE_MAIN_EXECUTABLE(UWBSOTStudio)
 

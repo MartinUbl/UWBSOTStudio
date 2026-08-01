@@ -124,6 +124,10 @@ void CStudio_GUI::Frame_Configuration() {
 			}
 
 			mIs_Configured = true;
+
+			if (Restore_Script_Dir()) {
+				Refresh_Script_List(mScript_Directory);
+			}
 		}
 	}
 	ImGui::EndChild();
@@ -136,8 +140,6 @@ void CStudio_GUI::Draw_Module_Configuration(const std::string& title, const std:
 	const std::vector<TPlugin_Descriptor_Internal>& plugins, int& selected_plugin_index, std::vector<std::string>& parameter_values) {
 
 	ImGui::BeginGroup();
-
-	//ImGui::Text("%s", title.c_str());
 
 	const char* text = title.c_str();
 	const ImVec2 padding(6.0f, 3.0f);

@@ -4,10 +4,16 @@
 #include <vector>
 #include <memory>
 #include <chrono>
+#include <filesystem>
 
 #include <uwbsot/PluginInterface.h>
 
 #include <imgui.h>
+
+#include <pybind11/embed.h>
+#include "PythonEngine/Runtime.h"
+
+namespace py = pybind11;
 
 using TClock = std::chrono::steady_clock;
 
@@ -23,7 +29,19 @@ constexpr auto Highlight_Color = IM_COL32(224, 177, 0, 255);
 
 extern std::vector<ImVec4> gTeam_Colors;
 
+enum class NScript_Type {
+	None,
+	Agent,
+	Controller
+};
+
 struct GLFWwindow;
+
+struct TRobot_Cached_Info {
+	std::string scriptName;
+	float leftSpeed;
+	float rightSpeed;
+};
 
 class CStudio_GUI {
 	private:
@@ -44,8 +62,11 @@ class CStudio_GUI {
 
 		std::vector<size_t> mTeam_Sizes;
 
+		std::filesystem::path mScript_Directory;
+
 		std::chrono::time_point<TClock> mLast_Update_Time;
 		std::vector<TRobot_Position> mRobot_Positions;
+		std::vector<TRobot_Cached_Info> mRobot_Cached_Info;
 
 		float mArena_Width = 0.0f;
 		float mArena_Height = 0.0f;
@@ -60,12 +81,31 @@ class CStudio_GUI {
 		void* mCamera_Buffer = nullptr;
 		TImGui_Texture mCamera_Texture;
 
+		struct TScript_Entry {
+			std::string id;
+			std::string name;
+			NScript_Type type;
+			std::filesystem::path path;
+		};
+
+		std::vector<TScript_Entry> mScript_List;
+
+		std::unique_ptr<CPython_Runtime> mPython_Runtime;
+
+		TClock::time_point mController_Start_Time;
+
 	public:
 		CStudio_GUI(GLFWwindow* window, std::vector<TPlugin_Descriptor_Internal> sensing_plugins, std::vector<TPlugin_Descriptor_Internal> control_plugins);
 
 		static void Configure_ImGui();
 
 		void Draw();
+
+	public: // pybind API
+		int Get_Robot_Count() const;
+		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id);
+		long long Get_Elapsed_Time_Milliseconds() const;
+		void Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right);
 
 	private:
 		void Frame_Configuration();
@@ -77,9 +117,14 @@ class CStudio_GUI {
 		void Store_Plugin_Defaults();
 		void Restore_Plugin_Defaults();
 
+		void Store_Script_Dir();
+		bool Restore_Script_Dir();
+
 		void Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size);
 		void Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size);
 		void Draw_Camera_View(ImVec2 cursorPos, ImVec2 size);
 
 		bool Update_Camera_Texture(const void* rgbaPixels, int width, int height);
+
+		void Refresh_Script_List(const std::filesystem::path& script_directory);
 };

@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <filesystem>
 
 namespace uwbsot {
 	namespace utils {
@@ -40,5 +41,8 @@ namespace uwbsot {
 			private:
 				std::map<std::string, std::string> mParameter_Map;
 		};
+
+
+		std::filesystem::path GetAppDataDirectory(const std::string& appName);
 	}
 }
