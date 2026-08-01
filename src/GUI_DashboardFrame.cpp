@@ -542,6 +542,27 @@ void CStudio_GUI::Set_Robot_Speed(size_t team_index, size_t robot_index, float s
 	}
 }
 
+py::tuple CStudio_GUI::Get_Robot_Position(size_t team_index, size_t robot_index) const {
+
+	int targetIdx = -1;
+	for (size_t i = 0; i < mRobot_Positions.size(); ++i) {
+		if (mRobot_Positions[i].robot_idx == static_cast<int>(robot_index) && mRobot_Positions[i].team_idx == static_cast<int>(team_index)) {
+			targetIdx = static_cast<int>(i);
+			break;
+		}
+	}
+
+	if (targetIdx == -1) {
+		return py::make_tuple(0.0, 0.0, 0.0); // Return default values if robot not found
+	}
+
+	return py::make_tuple(mRobot_Positions[targetIdx].x, mRobot_Positions[targetIdx].y, mRobot_Positions[targetIdx].orientation);
+}
+
+py::tuple CStudio_GUI::Get_Ball_Position() const {
+	return py::make_tuple(mBall.x, mBall.y, mBall.radius);
+}
+
 PYBIND11_EMBEDDED_MODULE(env, m)
 {
 	py::class_<CStudio_GUI>(m, "env")
@@ -568,5 +589,13 @@ PYBIND11_EMBEDDED_MODULE(env, m)
 			py::arg("robot_index"),
 			py::arg("speed_left"),
 			py::arg("speed_right")
+		)
+		.def("get_robot_position",
+			&CStudio_GUI::Get_Robot_Position,
+			py::arg("team_index"),
+			py::arg("robot_index")
+		)
+		.def("get_ball_position",
+			&CStudio_GUI::Get_Ball_Position
 		);
 }

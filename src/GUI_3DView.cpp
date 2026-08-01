@@ -158,6 +158,10 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		float view_elevation;
 		float view_zoom;
 		ImVec2 view_pan;
+		NBall_State ball_state;
+		float ball_x;
+		float ball_y;
+		float ball_radius;
 		std::vector<TRobot_Position> robot_positions;
 	};
 
@@ -170,12 +174,17 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 	render_data.view_elevation = mArena3D_View_Elevation;
 	render_data.view_zoom = mArena3D_View_Zoom;
 	render_data.view_pan = mArena3D_View_Pan;
+	render_data.ball_state = mBall.state;
+	render_data.ball_x = mBall.x;
+	render_data.ball_y = mBall.y;
+	render_data.ball_radius = mBall.radius;
 	render_data.robot_positions = mRobot_Positions;
 
 	draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd* command) {
 		constexpr float Robot_Size = 10.0f;
 		constexpr float Margin_Size = 5.0f;
 		constexpr float Deg_Per_Rad = 57.29577951308232f;
+		constexpr float Pi = 3.14159265358979323846f;
 
 		const auto* data = static_cast<const TOpenGL_Arena_Render_Data*>(command->UserCallbackData);
 		if (data == nullptr || data->size.x <= 0.0f || data->size.y <= 0.0f) {
@@ -300,6 +309,21 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 				}
 			}
 		}
+		if (data->ball_state != NBall_State::Not_Found && data->ball_radius > 0.0f) {
+			for (const float x : { data->ball_x - data->ball_radius, data->ball_x + data->ball_radius }) {
+				for (const float y : { data->ball_y - data->ball_radius, data->ball_y + data->ball_radius }) {
+					for (const float z : { 0.0f, data->ball_radius * 2.0f }) {
+						const Vec3 projected = transform_to_camera(Vec3{ x, y, z });
+						view_min.x = std::min(view_min.x, projected.x);
+						view_min.y = std::min(view_min.y, projected.y);
+						view_min.z = std::min(view_min.z, projected.z);
+						view_max.x = std::max(view_max.x, projected.x);
+						view_max.y = std::max(view_max.y, projected.y);
+						view_max.z = std::max(view_max.z, projected.z);
+					}
+				}
+			}
+		}
 
 		const float view_padding = 24.0f;
 		const float zoom = std::max(0.05f, data->view_zoom);
@@ -409,6 +433,35 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 			glEnd();
 			};
 
+		auto draw_ball = [&](float radius) {
+			constexpr int Rings = 12;
+			constexpr int Segments = 24;
+			const ImVec4 orange(1.0f, 0.36f, 0.0f, 1.0f);
+
+			for (int ring = 0; ring < Rings; ++ring) {
+				const float theta0 = static_cast<float>(ring) * Pi / static_cast<float>(Rings);
+				const float theta1 = static_cast<float>(ring + 1) * Pi / static_cast<float>(Rings);
+				const float z0 = std::cos(theta0);
+				const float z1 = std::cos(theta1);
+				const float xy0 = std::sin(theta0);
+				const float xy1 = std::sin(theta1);
+
+				glBegin(GL_TRIANGLE_STRIP);
+				for (int segment = 0; segment <= Segments; ++segment) {
+					const float phi = static_cast<float>(segment) * 2.0f * Pi / static_cast<float>(Segments);
+					const float cos_phi = std::cos(phi);
+					const float sin_phi = std::sin(phi);
+
+					set_color(orange, 0.72f + 0.28f * std::max(0.0f, z0));
+					glVertex3f(radius * xy0 * cos_phi, radius * xy0 * sin_phi, radius * z0);
+
+					set_color(orange, 0.72f + 0.28f * std::max(0.0f, z1));
+					glVertex3f(radius * xy1 * cos_phi, radius * xy1 * sin_phi, radius * z1);
+				}
+				glEnd();
+			}
+		};
+
 		glBegin(GL_QUADS);
 		glColor4f(0.07f, 0.11f, 0.18f, 1.0f);
 		glVertex3f(0.0f, 0.0f, 0.0f);
@@ -444,6 +497,13 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		draw_box(-Margin_Size, data->arena_height, 0.0f, data->arena_width + Margin_Size, data->arena_height + Margin_Size, Margin_Size, margin_color);
 		draw_box(-Margin_Size, 0.0f, 0.0f, 0.0f, data->arena_height, Margin_Size, margin_color);
 		draw_box(data->arena_width, 0.0f, 0.0f, data->arena_width + Margin_Size, data->arena_height, Margin_Size, margin_color);
+
+		if (data->ball_state != NBall_State::Not_Found && data->ball_radius > 0.0f) {
+			glPushMatrix();
+			glTranslatef(data->ball_x, data->ball_y, data->ball_radius);
+			draw_ball(data->ball_radius);
+			glPopMatrix();
+		}
 
 		for (const auto& pos : data->robot_positions) {
 			const ImVec4 team_color = gTeam_Colors[pos.team_idx % gTeam_Colors.size()];

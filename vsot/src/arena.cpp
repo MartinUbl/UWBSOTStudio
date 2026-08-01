@@ -85,7 +85,7 @@ bool CArena::Start() {
 
 	mBall.x = mArgs.arena_width * 0.5f;
 	mBall.y = mArgs.arena_height * 0.5f;
-	mBall.radius = 2.0f;
+	mBall.radius = 2.1f;
 	mBall.state = NBall_State::Ground;
 
 	Create_Ball();

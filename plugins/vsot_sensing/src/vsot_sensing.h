@@ -19,7 +19,15 @@ class CVSOT_Sensing_Plugin : public ISensing_Plugin {
 			uint16_t team_idx;
 		};
 
+		struct TCached_Ball_Position {
+			NBall_State state;
+			float x;
+			float y;
+			float radius;
+		};
+
 		std::vector<TCached_Robot_Position> mCached_Robot_Positions;
+		TCached_Ball_Position mCached_Ball_Position;
 
 	protected:
 		bool Send_Metadata_Request(char** response, vsot::NOpcode opcode = vsot::NOpcode::Metadata_Request) const;

@@ -193,6 +193,11 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Ball_Position(NBall_State* state, float* x
 	*y = response->y;
 	*radius = response->radius;
 
+	mCached_Ball_Position.state = static_cast<NBall_State>(response->state);
+	mCached_Ball_Position.x = response->x;
+	mCached_Ball_Position.y = response->y;
+	mCached_Ball_Position.radius = response->radius;
+
 	delete[] reinterpret_cast<char*>(response);
 
 	return NLib_Result::Success;
@@ -357,6 +362,29 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Camera_Image(void* rgbaPixels, int* width,
 				pixel[1] = 255; // G
 				pixel[2] = 255; // B
 				pixel[3] = 255; // A
+			}
+		}
+	}
+
+	// draw orange circle for the ball position
+	{
+		int x = static_cast<int>(mCached_Ball_Position.x / 220.0f * mock_cameraWidth);
+		int y = static_cast<int>(mCached_Ball_Position.y / 180.0f * mock_cameraHeight);
+		int radius = static_cast<int>(mCached_Ball_Position.radius / 220.0f * mock_cameraWidth);
+		for (int dy = -radius; dy <= radius; ++dy) {
+			for (int dx = -radius; dx <= radius; ++dx) {
+				if (dx * dx + dy * dy <= radius * radius) {
+					int px = x + dx;
+					int py = y + dy;
+					if (px < 0 || px >= mock_cameraWidth || py < 0 || py >= mock_cameraHeight) {
+						continue;
+					}
+					uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (py * mock_cameraWidth + px) * 4;
+					pixel[0] = 255; // R
+					pixel[1] = 75;  // G
+					pixel[2] = 0;   // B
+					pixel[3] = 255; // A
+				}
 			}
 		}
 	}

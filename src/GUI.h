@@ -129,6 +129,8 @@ class CStudio_GUI {
 		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id);
 		long long Get_Elapsed_Time_Milliseconds() const;
 		void Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right);
+		py::tuple Get_Robot_Position(size_t team_index, size_t robot_index) const;
+		py::tuple Get_Ball_Position() const;
 
 	private:
 		void Frame_Configuration();

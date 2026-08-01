@@ -62,5 +62,5 @@ void CStudio_GUI::Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size) {
 
 	// draw the ball
 	ImVec2 ballPos(arenaOffset.x + mBall.x * factorX, arenaOffset.y + mBall.y * factorY);
-	ImGui::GetWindowDrawList()->AddCircleFilled(ballPos, mBall.radius * factorX, IM_COL32(255, 255, 255, 255));
+	ImGui::GetWindowDrawList()->AddCircleFilled(ballPos, mBall.radius * factorX, IM_COL32(255, 92, 0, 255));
 }

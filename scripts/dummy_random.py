@@ -12,7 +12,7 @@ class Agent:
         pass
 
     def initialize(self):
-        self.last_ms = 0
+        self.last_ms = -2000 # to start immediatelly
         pass
 
     def update(self):

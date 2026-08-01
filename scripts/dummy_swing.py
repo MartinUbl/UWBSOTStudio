@@ -11,7 +11,7 @@ class Agent:
         pass
 
     def initialize(self):
-        self.last_ms = 0
+        self.last_ms = -3000 # to start immediatelly
         self.state = 0
         pass
 
