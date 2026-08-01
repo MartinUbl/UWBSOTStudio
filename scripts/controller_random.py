@@ -1,6 +1,6 @@
-#ID: dummy
+#ID: randomctl
 #TYPE: controller
-#NAME: Dummy chaotic controller
+#NAME: Dummy random controller
 
 import env
 
@@ -9,10 +9,8 @@ class Controller:
         self.team_id = team_id
 
     def initialize(self):
-        count = env.control.get_robot_count()
-        for i in range(int(count/2)):
-            env.control.set_robot_script(self.team_id, i, 'swing')
-        for i in range(int(count/2), int(count)):
+        count = env.control.get_robot_count(self.team_id)
+        for i in range(count):
             env.control.set_robot_script(self.team_id, i, 'random')
 
     def update(self):

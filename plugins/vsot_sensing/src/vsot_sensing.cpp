@@ -167,22 +167,102 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** position
 	return NLib_Result::Success;
 }
 
+namespace {
+	const char letter_V[] = {
+		0b10000001,
+		0b10000001,
+		0b01000010,
+		0b01000010,
+		0b00100100,
+		0b00100100,
+		0b00011000,
+		0b00011000
+	};
+	const char letter_S[] = {
+		0b00111100,
+		0b01000010,
+		0b01000000,
+		0b00111100,
+		0b00000010,
+		0b01000010,
+		0b00111100,
+		0b00000000
+	};
+	const char letter_O[] = {
+		0b00111100,
+		0b01000010,
+		0b01000010,
+		0b01000010,
+		0b01000010,
+		0b01000010,
+		0b00111100,
+		0b00000000
+	};
+	const char letter_T[] = {
+		0b01111110,
+		0b00010000,
+		0b00010000,
+		0b00010000,
+		0b00010000,
+		0b00010000,
+		0b00010000,
+		0b00000000
+	};
+
+	const char letter_C[] = {
+		0b00111100,
+		0b01000010,
+		0b01000000,
+		0b01000000,
+		0b01000000,
+		0b01000010,
+		0b00111100,
+		0b00000000
+	};
+
+	const char letter_A[] = {
+		0b00111100,
+		0b01000010,
+		0b01000010,
+		0b01111110,
+		0b01000010,
+		0b01000010,
+		0b01000010,
+		0b00000000
+	};
+
+	const char letter_M[] = {
+		0b01000010,
+		0b01100110,
+		0b01011010,
+		0b01000010,
+		0b01000010,
+		0b01000010,
+		0b01000010,
+		0b00000000
+	};
+}
+
 NLib_Result CVSOT_Sensing_Plugin::Get_Camera_Image(void* rgbaPixels, int* width, int* height) {
+
+	constexpr int mock_cameraWidth = 240;
+	constexpr int mock_cameraHeight = 200;
+
 	if (rgbaPixels == nullptr) {
-		*width = 120;
-		*height = 100;
+		*width = mock_cameraWidth;
+		*height = mock_cameraHeight;
 		return NLib_Result::Success;
 	}
 
 	// check for fit
-	if (*width * *height < 120 * 100) {
+	if (*width * *height < mock_cameraWidth * mock_cameraHeight) {
 		return NLib_Result::Invalid_Parameters;
 	}
 
 	// fill the image black
-	for (int y = 0; y < 100; ++y) {
-		for (int x = 0; x < 120; ++x) {
-			uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (y * 120 + x) * 4;
+	for (int y = 0; y < mock_cameraHeight; ++y) {
+		for (int x = 0; x < mock_cameraWidth; ++x) {
+			uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (y * mock_cameraWidth + x) * 4;
 			pixel[0] = 0; // R
 			pixel[1] = 0; // G
 			pixel[2] = 0; // B
@@ -191,31 +271,60 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Camera_Image(void* rgbaPixels, int* width,
 	}
 
 	// set the width and height
-	*width = 120;
-	*height = 100;
+	*width = mock_cameraWidth;
+	*height = mock_cameraHeight;
+
+	// draw a dummy text
+	auto drawLetter = [&](const char* letter, int letterWidth, int letterHeight, int offsetX, int offsetY) {
+		for (int y = 0; y < letterHeight; ++y) {
+			for (int x = 0; x < letterWidth; ++x) {
+				if (letter[y] & (1 << (7 - x))) {
+					int px = offsetX + x;
+					int py = offsetY + y;
+					if (px < 0 || px >= mock_cameraWidth || py < 0 || py >= mock_cameraHeight) {
+						continue;
+					}
+					uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (py * mock_cameraWidth + px) * 4;
+					pixel[0] = 64; // R
+					pixel[1] = 64; // G
+					pixel[2] = 64; // B
+					pixel[3] = 255; // A
+				}
+			}
+		}
+	};
+
+	drawLetter(letter_V, 8, 8, 30, 46);
+	drawLetter(letter_S, 8, 8, 40, 46);
+	drawLetter(letter_O, 8, 8, 50, 46);
+	drawLetter(letter_T, 8, 8, 60, 46);
+
+	drawLetter(letter_C, 8, 8, 30, 56);
+	drawLetter(letter_A, 8, 8, 40, 56);
+	drawLetter(letter_M, 8, 8, 50, 56);
 
 	// draw a pixel for each robot position
 	for (const auto& pos : mCached_Robot_Positions) {
-		int x = static_cast<int>(pos.x / 220.0f * 120.0f);
-		int y = static_cast<int>(pos.y / 180.0f * 100.0f);
-		if (x < 0 || x >= 120 || y < 0 || y >= 100) {
+		int x = static_cast<int>(pos.x / 220.0f * mock_cameraWidth);
+		int y = static_cast<int>(pos.y / 180.0f * mock_cameraHeight);
+		if (x < 0 || x >= mock_cameraWidth || y < 0 || y >= mock_cameraHeight) {
 			continue;
 		}
 
-		const int nbh = 2;
+		const int nbh = 3;
 
 		// fill the pixel and 1 more sorrounding pixels to make it more visible
 		for (int dy = -nbh; dy <= nbh; ++dy) {
 			for (int dx = -nbh; dx <= nbh; ++dx) {
 				int px = x + dx;
 				int py = y + dy;
-				if (px < 0 || px >= 120 || py < 0 || py >= 100) {
+				if (px < 0 || px >= mock_cameraWidth || py < 0 || py >= mock_cameraHeight) {
 					continue;
 				}
-				uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (py * 120 + px) * 4;
+				uint8_t* pixel = reinterpret_cast<uint8_t*>(rgbaPixels) + (py * mock_cameraWidth + px) * 4;
 				pixel[0] = 255; // R
-				pixel[1] = 0;   // G
-				pixel[2] = 0;   // B
+				pixel[1] = 255; // G
+				pixel[2] = 255; // B
 				pixel[3] = 255; // A
 			}
 		}

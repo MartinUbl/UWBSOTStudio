@@ -137,7 +137,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		if (mArena3D_View_Rotation < 0.0f) {
 			mArena3D_View_Rotation += 360.0f;
 		}
-		mArena3D_View_Elevation = std::clamp(mArena3D_View_Elevation - io.MouseDelta.y * 0.25f, 15.0f, 70.0f);
+		mArena3D_View_Elevation = std::clamp(mArena3D_View_Elevation + io.MouseDelta.y * 0.25f, 15.0f, 70.0f);
 		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
 	}
 	else if (mArena3D_Is_Panning) {

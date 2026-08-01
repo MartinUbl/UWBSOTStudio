@@ -39,8 +39,21 @@ struct GLFWwindow;
 
 struct TRobot_Cached_Info {
 	std::string scriptName;
-	float leftSpeed;
-	float rightSpeed;
+	float leftSpeed = 0.0f;
+	float rightSpeed = 0.0f;
+};
+
+enum class NLog_Severity {
+	Info,
+	Warning,
+	Error
+};
+
+struct TLog_Entry {
+	NLog_Severity severity = NLog_Severity::Info;
+	std::string timestamp;
+	std::string source;
+	std::string message;
 };
 
 class CStudio_GUI {
@@ -67,6 +80,7 @@ class CStudio_GUI {
 		std::chrono::time_point<TClock> mLast_Update_Time;
 		std::vector<TRobot_Position> mRobot_Positions;
 		std::vector<TRobot_Cached_Info> mRobot_Cached_Info;
+		std::vector<TLog_Entry> mLog_Entries;
 
 		float mArena_Width = 0.0f;
 		float mArena_Height = 0.0f;
@@ -102,7 +116,7 @@ class CStudio_GUI {
 		void Draw();
 
 	public: // pybind API
-		int Get_Robot_Count() const;
+		int Get_Robot_Count(size_t team_index) const;
 		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id);
 		long long Get_Elapsed_Time_Milliseconds() const;
 		void Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right);
@@ -127,4 +141,5 @@ class CStudio_GUI {
 		bool Update_Camera_Texture(const void* rgbaPixels, int width, int height);
 
 		void Refresh_Script_List(const std::filesystem::path& script_directory);
+		void Log_Message(NLog_Severity severity, const std::string& source_module, const std::string& message);
 };
