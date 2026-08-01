@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 namespace {
@@ -211,7 +212,6 @@ void CStudio_GUI::Frame_Dashboard()
 
 			ImGui::Spacing();
 
-			static int selected_controller_index = -1;
 			std::vector<size_t> controller_indices;
 			for (size_t i = 0; i < mScript_List.size(); ++i) {
 				if (mScript_List[i].type == NScript_Type::Controller) {
@@ -219,33 +219,6 @@ void CStudio_GUI::Frame_Dashboard()
 				}
 			}
 
-			if (selected_controller_index >= static_cast<int>(controller_indices.size())) {
-				selected_controller_index = controller_indices.empty() ? -1 : 0;
-			}
-			if (selected_controller_index < 0 && !controller_indices.empty()) {
-				selected_controller_index = 0;
-			}
-
-			const char* selected_controller_name = selected_controller_index >= 0
-				? mScript_List[controller_indices[selected_controller_index]].name.c_str()
-				: "No controllers found";
-
-			ImGui::SetNextItemWidth(-1.0f);
-			if (ImGui::BeginCombo("Controller", selected_controller_name)) {
-				for (size_t i = 0; i < controller_indices.size(); ++i) {
-					const bool is_selected = selected_controller_index == static_cast<int>(i);
-					const auto& script = mScript_List[controller_indices[i]];
-					if (ImGui::Selectable(script.name.c_str(), is_selected)) {
-						selected_controller_index = static_cast<int>(i);
-					}
-					if (is_selected) {
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-				ImGui::EndCombo();
-			}
-
-			static int selected_team_index = -1;
 			std::vector<uint16_t> team_indices;
 			for (const auto& robot : mRobot_Positions) {
 				if (std::find(team_indices.begin(), team_indices.end(), robot.team_idx) == team_indices.end()) {
@@ -259,56 +232,72 @@ void CStudio_GUI::Frame_Dashboard()
 			}
 			std::sort(team_indices.begin(), team_indices.end());
 
-			if (selected_team_index >= static_cast<int>(team_indices.size())) {
-				selected_team_index = team_indices.empty() ? -1 : 0;
-			}
-			if (selected_team_index < 0 && !team_indices.empty()) {
-				selected_team_index = 0;
-			}
-
-			std::string selected_team_name = selected_team_index >= 0
-				? "Team " + std::to_string(team_indices[selected_team_index])
-				: "No teams present";
-
-			ImGui::SetNextItemWidth(-1.0f);
-			if (ImGui::BeginCombo("Team", selected_team_name.c_str())) {
-				for (size_t i = 0; i < team_indices.size(); ++i) {
-					const bool is_selected = selected_team_index == static_cast<int>(i);
-					const std::string team_name = "Team " + std::to_string(team_indices[i]);
-					if (ImGui::Selectable(team_name.c_str(), is_selected)) {
-						selected_team_index = static_cast<int>(i);
-					}
-					if (is_selected) {
-						ImGui::SetItemDefaultFocus();
-					}
+			static std::map<uint16_t, int> selected_controller_by_team;
+			for (uint16_t team_index : team_indices) {
+				int& selected_controller_index = selected_controller_by_team[team_index];
+				if (selected_controller_index >= static_cast<int>(controller_indices.size())) {
+					selected_controller_index = controller_indices.empty() ? -1 : 0;
 				}
-				ImGui::EndCombo();
+				if (selected_controller_index < 0 && !controller_indices.empty()) {
+					selected_controller_index = 0;
+				}
+			}
+
+			if (team_indices.empty()) {
+				ImGui::TextDisabled("No teams present");
+			}
+
+			for (uint16_t team_index : team_indices) {
+				const int selected_controller_index = selected_controller_by_team[team_index];
+				const char* selected_controller_name = selected_controller_index >= 0
+					? mScript_List[controller_indices[selected_controller_index]].name.c_str()
+					: "No controllers found";
+
+				const std::string combo_label = "##Team " + std::to_string(team_index);
+				ImGui::Text("Team %d:", team_index);
+				ImGui::SetNextItemWidth(-1.0f);
+				if (ImGui::BeginCombo(combo_label.c_str(), selected_controller_name)) {
+					for (size_t i = 0; i < controller_indices.size(); ++i) {
+						const bool is_selected = selected_controller_by_team[team_index] == static_cast<int>(i);
+						const auto& script = mScript_List[controller_indices[i]];
+						if (ImGui::Selectable(script.name.c_str(), is_selected)) {
+							selected_controller_by_team[team_index] = static_cast<int>(i);
+						}
+						if (is_selected) {
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
 			}
 
 			const bool can_start_controller = mPython_Runtime && !controller_indices.empty() && !team_indices.empty();
 			if (!can_start_controller) {
 				ImGui::BeginDisabled();
 			}
-			if (ImGui::Button("Start controller", ImVec2(-1.0f, 0.0f))) {
-				const auto& script = mScript_List[controller_indices[selected_controller_index]];
-				const uint16_t team_index = team_indices[selected_team_index];
+			if (ImGui::Button("Start match", ImVec2(-1.0f, 0.0f))) {
+				mController_Start_Time = TClock::now();
 
-				std::cout << "Loading controller script: " << script.path << std::endl;
+				for (uint16_t team_index : team_indices) {
+					const int selected_controller_index = selected_controller_by_team[team_index];
+					if (selected_controller_index < 0 || selected_controller_index >= static_cast<int>(controller_indices.size())) {
+						continue;
+					}
 
-				auto fname = script.path.filename().stem().string();
+					const auto& script = mScript_List[controller_indices[selected_controller_index]];
+					std::cout << "Loading controller script: " << script.path << std::endl;
 
-				try {
+					auto fname = script.path.filename().stem().string();
 
-					mController_Start_Time = TClock::now();
-
-					auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index);
-
-					ctl.Initialize();
-					Log_Message(NLog_Severity::Info, "Python", "Loaded controller script: " + fname + " for team " + std::to_string(team_index));
-				}
-				catch (py::error_already_set& e) {
-					std::cerr << "Error loading controller script: " << e.what() << std::endl;
-					Log_Message(NLog_Severity::Error, "Python", e.what());
+					try {
+						auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index);
+						ctl.Initialize();
+						Log_Message(NLog_Severity::Info, "Python", "Loaded controller script: " + fname + " for team " + std::to_string(team_index));
+					}
+					catch (py::error_already_set& e) {
+						std::cerr << "Error loading controller script: " << e.what() << std::endl;
+						Log_Message(NLog_Severity::Error, "Python", e.what());
+					}
 				}
 			}
 			if (!can_start_controller) {
