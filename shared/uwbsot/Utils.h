@@ -8,6 +8,10 @@
 namespace uwbsot {
 	namespace utils {
 
+		/**
+		 * A utility class to map parameter names to their corresponding values.
+		 * It provides a convenient way to retrieve parameter values by name and convert them to the desired type.
+		 */
 		class CParameter_Map {
 			public:
 				CParameter_Map(const char** names, const char** values, size_t size) {
@@ -42,7 +46,10 @@ namespace uwbsot {
 				std::map<std::string, std::string> mParameter_Map;
 		};
 
-
+		/**
+		 * Retrieves the application data directory for the given application name.
+		 * The directory is determined based on the operating system and follows the conventions for storing application data.
+		 */
 		std::filesystem::path GetAppDataDirectory(const std::string& appName);
 	}
 }

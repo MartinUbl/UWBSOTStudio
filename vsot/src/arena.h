@@ -27,9 +27,9 @@ struct TArena_Robot {
 
 struct TArena_Ball {
 	NBall_State state = NBall_State::Not_Found;
-	float x;
-	float y;
-	float radius;
+	float x = 0.0f;
+	float y = 0.0f;
+	float radius = 1.0f;
 
 	b2BodyId body_id = b2_nullBodyId;
 	b2ShapeId shape_id = b2_nullShapeId;
@@ -50,7 +50,7 @@ class CArena {
 
 		std::unique_ptr<CNetwork> mNetwork;
 
-		b2WorldId mWorld_Id;
+		b2WorldId mWorld_Id = b2_nullWorldId;
 		std::vector<TArena_Robot> mRobots;
 
 		TArena_Walls mWalls;

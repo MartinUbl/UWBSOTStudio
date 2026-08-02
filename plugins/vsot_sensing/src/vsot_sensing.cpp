@@ -173,11 +173,15 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** position
 	vsot::TMessage<vsot::TRefresh_Positions_Response> response_body;
 	response_body.Deserialize_From(response);
 
-	*positions_count = static_cast<uint16_t>(response_body.body.positions.size());
-	*positions = new TRobot_Position[*positions_count];
+	size_t position_count = response_body.body.positions.size();
+
+	// Allocate the correct amount of memory
+	*positions = new TRobot_Position[position_count];
+	*positions_count = static_cast<uint16_t>(position_count);
 
 	mCached_Robot_Positions.clear();
-	for (uint16_t i = 0; i < response_body.body.positions.size(); ++i) {
+
+	for (size_t i = 0; i < position_count; ++i) {
 		(*positions)[i].robot_idx = response_body.body.positions[i].robot_idx;
 		(*positions)[i].x = response_body.body.positions[i].x;
 		(*positions)[i].y = response_body.body.positions[i].y;

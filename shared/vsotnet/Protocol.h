@@ -45,10 +45,10 @@ namespace vsot {
 	};
 
 	struct TSet_Robot_Speed {
-		uint16_t robot_idx;
-		uint16_t team_idx;
-		float left;
-		float right;
+		uint16_t robot_idx = 0;
+		uint16_t team_idx = 0;
+		float left = 0.0f;
+		float right = 0.0f;
 
 		void Serialize_To(CPacket& pkt) const {
 			pkt.Put(robot_idx);
@@ -66,8 +66,8 @@ namespace vsot {
 	};
 
 	struct TRefresh_Positions_Request {
-		uint16_t robot_idx; // or Robot_Idx_Any
-		uint16_t team_idx;  // or Team_Idx_Any
+		uint16_t robot_idx = 0;		// or Robot_Idx_Any
+		uint16_t team_idx = 0;		// or Team_Idx_Any
 
 		void Serialize_To(CPacket& pkt) const {
 			pkt.Put(robot_idx);
@@ -81,11 +81,11 @@ namespace vsot {
 	};
 
 	struct TNet_Robot_Position {
-		uint16_t robot_idx;
-		uint16_t team_idx;
-		float x;
-		float y;
-		float orientation;
+		uint16_t robot_idx = 0;
+		uint16_t team_idx = 0;
+		float x = 0.0f;
+		float y = 0.0f;
+		float orientation = 0.0f;
 
 		void Serialize_To(CPacket& pkt) const {
 			pkt.Put(robot_idx);
@@ -117,9 +117,9 @@ namespace vsot {
 	};
 
 	struct TMetadata_Response {
-		float arena_width;
-		float arena_height;
-		float goal_width;
+		float arena_width = 0.0f;
+		float arena_height = 0.0f;
+		float goal_width = 0.0f;
 		std::vector<uint16_t> team_counts;
 
 		void Serialize_To(CPacket& pkt) const {
@@ -138,10 +138,10 @@ namespace vsot {
 	};
 
 	struct TBall_Position_Response {
-		uint16_t state; // NBall_State
-		float x;
-		float y;
-		float radius;
+		uint16_t state = 0;		// NBall_State
+		float x = 0.0f;
+		float y = 0.0f;
+		float radius = 1.0f;
 
 		void Serialize_To(CPacket& pkt) const {
 			pkt.Put(state);
@@ -161,8 +161,8 @@ namespace vsot {
 #pragma pack(push, 1)
 
 	struct TMessage_Header {
-		NOpcode opcode;
-		uint16_t length; // length of the body in bytes
+		NOpcode opcode = NOpcode::Nop;
+		uint16_t length = 0;					// length of the body in bytes
 
 		void Serialize_To(CPacket& pkt) const {
 			pkt.Put(opcode);

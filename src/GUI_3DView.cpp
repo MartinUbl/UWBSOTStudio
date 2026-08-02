@@ -150,19 +150,19 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 	}
 
 	struct TOpenGL_Arena_Render_Data {
-		ImVec2 rect_min;
-		ImVec2 size;
-		float arena_width;
-		float arena_height;
-		float goal_width;
-		float view_rotation;
-		float view_elevation;
-		float view_zoom;
-		ImVec2 view_pan;
-		NBall_State ball_state;
-		float ball_x;
-		float ball_y;
-		float ball_radius;
+		ImVec2 rect_min = ImVec2(0.0f, 0.0f);
+		ImVec2 size = ImVec2(0.0f, 0.0f);
+		float arena_width = 0.0f;
+		float arena_height = 0.0f;
+		float goal_width = 0.0f;
+		float view_rotation = 0.0f;
+		float view_elevation = 0.0f;
+		float view_zoom = 1.0f;
+		ImVec2 view_pan = ImVec2(0.0f, 0.0f);
+		NBall_State ball_state = NBall_State::Not_Found;
+		float ball_x = 0.0f;
+		float ball_y = 0.0f;
+		float ball_radius = 1.0f;
 		std::vector<TRobot_Position> robot_positions;
 	};
 

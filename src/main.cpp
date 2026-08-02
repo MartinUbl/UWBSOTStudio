@@ -8,13 +8,12 @@
 #include "GUI.h"
 #include "PluginRegistry.h"
 
-static void glfw_error_callback(int error, const char* description)
-{
+static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-int main()
-{
+int main() {
+
 	glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit()) {
 		return 1;
@@ -27,7 +26,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
 	GLFWwindow* window = glfwCreateWindow(1280, 720, "UWB SOT Studio", nullptr, nullptr);
-	if (window == nullptr) {
+	if (!window) {
 		glfwTerminate();
 		return 1;
 	}
@@ -35,10 +34,7 @@ int main()
 
 	gPlugin_Registry().Load_Plugins();
 
-	CStudio_GUI gui(
-		window,
-		gPlugin_Registry().Get_Sensing_Plugins(),
-		gPlugin_Registry().Get_Control_Plugins());
+	CStudio_GUI gui(window, gPlugin_Registry().Get_Sensing_Plugins(), gPlugin_Registry().Get_Control_Plugins());
 
 	glfwMaximizeWindow(window);
 

@@ -58,9 +58,9 @@ struct TLog_Entry {
 
 struct TBall {
 	NBall_State state = NBall_State::Not_Found;
-	float x;
-	float y;
-	float radius;
+	float x = 0.0f;
+	float y = 0.0f;
+	float radius = 1.0f;
 };
 
 class CStudio_GUI {

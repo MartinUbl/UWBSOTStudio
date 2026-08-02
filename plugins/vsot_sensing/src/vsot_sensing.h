@@ -14,16 +14,16 @@ class CVSOT_Sensing_Plugin : public ISensing_Plugin {
 
 		// only for dummy camera image generation
 		struct TCached_Robot_Position {
-			float x;
-			float y;
-			uint16_t team_idx;
+			float x = 0.0f;
+			float y = 0.0f;
+			uint16_t team_idx = 0;
 		};
 
 		struct TCached_Ball_Position {
-			NBall_State state;
-			float x;
-			float y;
-			float radius;
+			NBall_State state = NBall_State::Not_Found;
+			float x = 0.0f;
+			float y = 0.0f;
+			float radius = 1.0f;
 		};
 
 		std::vector<TCached_Robot_Position> mCached_Robot_Positions;

@@ -96,7 +96,7 @@ bool CArena::Start() {
 		}
 
 		for (size_t j = 0; j < mArgs.robots_per_team; j++) {
-			mRobots.emplace_back(static_cast<uint16_t>(j), static_cast<uint16_t>(i), cursor_x, cursor_y, (i == 1) ? std::numbers::pi : 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+			mRobots.emplace_back(static_cast<uint16_t>(j), static_cast<uint16_t>(i), cursor_x, cursor_y, (i == 1) ? std::numbers::pi_v<float> : 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 			if (i == 0) {
 				cursor_y += 15.0f;
 			}
