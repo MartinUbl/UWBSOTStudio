@@ -60,7 +60,11 @@ bool CNetwork::Start() {
 
 bool CNetwork::Stop() {
 	mRunning = false;
-	closesocket(mNet_Socket);
+
+	if (mNet_Socket != INVALID_SOCKET_VALUE) {
+		closesocket(mNet_Socket);
+		mNet_Socket = INVALID_SOCKET_VALUE;
+	}
 
 	if (mNet_Thread && mNet_Thread->joinable()) {
 		mNet_Thread->join();
@@ -152,7 +156,7 @@ void CNetwork::Thread_Fnc() {
 			continue;
 		}
 
-		//spdlog::info("Received message from {}:{}, opcode = {}, length = {}", inet_ntoa(src_addr.sin_addr), ntohs(src_addr.sin_port), static_cast<uint16_t>(header->opcode), header->length);
+		CPacket pkt(buffer.data(), total_received); // make sure to only use the received data and do not resize the buffer (to preserve memory)
 
 		if (header->opcode == vsot::NOpcode::Nop) {
 			spdlog::info("Received Nop message, ignoring");
@@ -163,9 +167,12 @@ void CNetwork::Thread_Fnc() {
 				spdlog::error("Invalid Set_Robot_Speed message length");
 				continue;
 			}
-			vsot::TSet_Robot_Speed* msg = reinterpret_cast<vsot::TSet_Robot_Speed*>(buffer.data() + sizeof(vsot::TMessage_Header));
+
+			vsot::TMessage<vsot::TSet_Robot_Speed> msg;
+			msg.Deserialize_From(pkt);
+
 			if (mCallbacks.on_speed_set) {
-				mCallbacks.on_speed_set(msg->robot_idx, msg->team_idx, msg->left, msg->right);
+				mCallbacks.on_speed_set(msg.body.robot_idx, msg.body.team_idx, msg.body.left, msg.body.right);
 			}
 		}
 		else if (header->opcode == vsot::NOpcode::Refresh_Positions_Request) {
@@ -173,9 +180,12 @@ void CNetwork::Thread_Fnc() {
 				spdlog::error("Invalid Refresh_Positions_Request message length");
 				continue;
 			}
-			vsot::TRefresh_Positions_Request* msg = reinterpret_cast<vsot::TRefresh_Positions_Request*>(buffer.data() + sizeof(vsot::TMessage_Header));
+			
+			vsot::TMessage<vsot::TRefresh_Positions_Request> msg;
+			msg.Deserialize_From(pkt);
+
 			if (mCallbacks.on_refresh_positions_request) {
-				mCallbacks.on_refresh_positions_request({ src_addr, src_addr_len, *msg });
+				mCallbacks.on_refresh_positions_request({ src_addr, src_addr_len, msg.body });
 			}
 		}
 		else if (header->opcode == vsot::NOpcode::Metadata_Request) {
@@ -205,21 +215,17 @@ void CNetwork::Thread_Fnc() {
 }
 
 void CNetwork::Send_Refresh_Positions_Response(const TWaiting_For_Positions& request, const std::vector<vsot::TNet_Robot_Position>& positions) {
+
 	vsot::TMessage<vsot::TRefresh_Positions_Response> response;
 	response.header.opcode = vsot::NOpcode::Refresh_Positions_Response;
-	response.header.length = sizeof(uint16_t) /* robot_count */ + positions.size() * sizeof(vsot::TNet_Robot_Position) /* robot_positions */;
 
-	response.body.robot_count = static_cast<uint16_t>(positions.size());
+	response.body.positions = positions;
 
-	std::vector<uint8_t> buffer(sizeof(vsot::TMessage_Header) + response.header.length);
-	std::copy(reinterpret_cast<const char*>(&response.header), reinterpret_cast<const char*>(&response.header) + sizeof(vsot::TMessage_Header), buffer.begin());
-	std::copy(reinterpret_cast<const char*>(&response.body.robot_count), reinterpret_cast<const char*>(&response.body.robot_count) + sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header));
-	std::copy(reinterpret_cast<const char*>(positions.data()), reinterpret_cast<const char*>(positions.data()) + positions.size() * sizeof(vsot::TNet_Robot_Position), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(uint16_t));
-
-	//spdlog::info("Sending Refresh_Positions_Response to {}:{}, robot_count = {}", inet_ntoa(request.src_addr.sin_addr), ntohs(request.src_addr.sin_port), response.body.robot_count);
+	CPacket pkt;
+	response.Serialize_To(pkt);
 
 	// send the response back to the requester
-	int res = SendTo_Proxy(mNet_Socket, buffer, request.src_addr, request.src_addr_len);
+	int res = SendTo_Proxy(mNet_Socket, pkt.Get_Raw_Data(), request.src_addr, request.src_addr_len);
 	if (res < 0) {
 		std::cerr << "Error sending Refresh_Positions_Response\n";
 	}
@@ -228,25 +234,19 @@ void CNetwork::Send_Refresh_Positions_Response(const TWaiting_For_Positions& req
 void CNetwork::Send_Metadata_Response(const TWaiting_For_Any& request, const std::vector<uint16_t>& teamCounts, float arenaWidth, float arenaHeight, float goalWidth) {
 	vsot::TMessage<vsot::TMetadata_Response> response;
 	response.header.opcode = vsot::NOpcode::Metadata_Response;
-	response.header.length = sizeof(uint16_t) /* team_count */ + teamCounts.size() * sizeof(uint16_t) /* team_counts */ + sizeof(float) * 3 /* arena_width, arena_height and goal_width */;
 
-	response.body.team_count = static_cast<uint16_t>(teamCounts.size());
+	response.body.team_counts = teamCounts;
 	response.body.arena_width = arenaWidth;
 	response.body.arena_height = arenaHeight;
 	response.body.goal_width = goalWidth;
 
-	std::vector<uint8_t> buffer(sizeof(vsot::TMessage_Header) + response.header.length);
-	std::copy(reinterpret_cast<const char*>(&response.header), reinterpret_cast<const char*>(&response.header) + sizeof(vsot::TMessage_Header), buffer.begin());
-	std::copy(reinterpret_cast<const char*>(&response.body.arena_width), reinterpret_cast<const char*>(&response.body.arena_width) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header));
-	std::copy(reinterpret_cast<const char*>(&response.body.arena_height), reinterpret_cast<const char*>(&response.body.arena_height) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float));
-	std::copy(reinterpret_cast<const char*>(&response.body.goal_width), reinterpret_cast<const char*>(&response.body.goal_width) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 2);
-	std::copy(reinterpret_cast<const char*>(&response.body.team_count), reinterpret_cast<const char*>(&response.body.team_count) + sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 3);
-	std::copy(reinterpret_cast<const char*>(teamCounts.data()), reinterpret_cast<const char*>(teamCounts.data()) + teamCounts.size() * sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 3 + sizeof(uint16_t));
+	CPacket pkt;
+	response.Serialize_To(pkt);
 
-	spdlog::info("Sending Metadata_Response to {}:{}, bufsize = {}, length = {}, team_count = {}", inet_ntoa(request.src_addr.sin_addr), ntohs(request.src_addr.sin_port), buffer.size(), response.header.length, response.body.team_count);
+	spdlog::info("Sending Metadata_Response to {}:{}, bufsize = {}, length = {}, team_count = {}", inet_ntoa(request.src_addr.sin_addr), ntohs(request.src_addr.sin_port), pkt.Get_Raw_Data().size(), response.header.length, response.body.team_counts.size());
 
 	// send the response back to the requester
-	int res = SendTo_Proxy(mNet_Socket, buffer, request.src_addr, request.src_addr_len);
+	int res = SendTo_Proxy(mNet_Socket, pkt.Get_Raw_Data(), request.src_addr, request.src_addr_len);
 	if (res < 0) {
 		std::cerr << "Error sending Metadata_Response\n";
 	}
@@ -255,20 +255,16 @@ void CNetwork::Send_Metadata_Response(const TWaiting_For_Any& request, const std
 void CNetwork::Send_Ball_Position_Response(const TWaiting_For_Any& request, uint16_t state, float x, float y, float radius) {
 	vsot::TMessage<vsot::TBall_Position_Response> response;
 	response.header.opcode = vsot::NOpcode::Ball_Position_Response;
-	response.header.length = sizeof(uint16_t) /* state */ + sizeof(float) * 3 /* x, y and radius */;
 	response.body.state = state;
 	response.body.x = x;
 	response.body.y = y;
 	response.body.radius = radius;
-	std::vector<uint8_t> buffer(sizeof(vsot::TMessage_Header) + response.header.length);
-	std::copy(reinterpret_cast<const char*>(&response.header), reinterpret_cast<const char*>(&response.header) + sizeof(vsot::TMessage_Header), buffer.begin());
-	std::copy(reinterpret_cast<const char*>(&response.body.state), reinterpret_cast<const char*>(&response.body.state) + sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header));
-	std::copy(reinterpret_cast<const char*>(&response.body.x), reinterpret_cast<const char*>(&response.body.x) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(uint16_t));
-	std::copy(reinterpret_cast<const char*>(&response.body.y), reinterpret_cast<const char*>(&response.body.y) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(uint16_t) + sizeof(float));
-	std::copy(reinterpret_cast<const char*>(&response.body.radius), reinterpret_cast<const char*>(&response.body.radius) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(uint16_t) + sizeof(float) * 2);
-	//spdlog::info("Sending Ball_Position_Response to {}:{}, bufsize = {}, length = {}, state = {}", inet_ntoa(request.src_addr.sin_addr), ntohs(request.src_addr.sin_port), buffer.size(), response.header.length, response.body.state);
+
+	CPacket pkt;
+	response.Serialize_To(pkt);
+
 	// send the response back to the requester
-	int res = SendTo_Proxy(mNet_Socket, buffer, request.src_addr, request.src_addr_len);
+	int res = SendTo_Proxy(mNet_Socket, pkt.Get_Raw_Data(), request.src_addr, request.src_addr_len);
 	if (res < 0) {
 		std::cerr << "Error sending Ball_Position_Response\n";
 	}

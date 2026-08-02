@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cstdint>
 
+#include "Packet.h"
+
 // platform-specific includes for networking here (e.g., <winsock2.h> for Windows, <sys/socket.h> for Unix)
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #include <winsock2.h>
@@ -24,8 +26,6 @@ using SOCK = int;
 constexpr int INVALID_SOCKET_VALUE = -1;
 
 #endif
-
-#pragma pack(push, 1)
 
 namespace vsot {
 
@@ -49,11 +49,35 @@ namespace vsot {
 		uint16_t team_idx;
 		float left;
 		float right;
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put(robot_idx);
+			pkt.Put(team_idx);
+			pkt.Put(left);
+			pkt.Put(right);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			robot_idx = pkt.Get<uint16_t>();
+			team_idx = pkt.Get<uint16_t>();
+			left = pkt.Get<float>();
+			right = pkt.Get<float>();
+		}
 	};
 
 	struct TRefresh_Positions_Request {
 		uint16_t robot_idx; // or Robot_Idx_Any
 		uint16_t team_idx;  // or Team_Idx_Any
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put(robot_idx);
+			pkt.Put(team_idx);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			robot_idx = pkt.Get<uint16_t>();
+			team_idx = pkt.Get<uint16_t>();
+		}
 	};
 
 	struct TNet_Robot_Position {
@@ -62,19 +86,55 @@ namespace vsot {
 		float x;
 		float y;
 		float orientation;
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put(robot_idx);
+			pkt.Put(team_idx);
+			pkt.Put(x);
+			pkt.Put(y);
+			pkt.Put(orientation);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			robot_idx = pkt.Get<uint16_t>();
+			team_idx = pkt.Get<uint16_t>();
+			x = pkt.Get<float>();
+			y = pkt.Get<float>();
+			orientation = pkt.Get<float>();
+		}
 	};
 
 	struct TRefresh_Positions_Response {
-		uint16_t robot_count;
-		TNet_Robot_Position positions[0]; // flexible array member
+		std::vector<TNet_Robot_Position> positions;
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put_Array(positions);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			positions = pkt.Get_Array<TNet_Robot_Position>();
+		}
 	};
 
 	struct TMetadata_Response {
 		float arena_width;
 		float arena_height;
 		float goal_width;
-		uint16_t team_count;
-		uint16_t team_counts[0]; // flexible array member
+		std::vector<uint16_t> team_counts;
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put(arena_width);
+			pkt.Put(arena_height);
+			pkt.Put(goal_width);
+			pkt.Put_Array(team_counts);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			arena_width = pkt.Get<float>();
+			arena_height = pkt.Get<float>();
+			goal_width = pkt.Get<float>();
+			team_counts = pkt.Get_Array<uint16_t>();
+		}
 	};
 
 	struct TBall_Position_Response {
@@ -82,25 +142,72 @@ namespace vsot {
 		float x;
 		float y;
 		float radius;
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put(state);
+			pkt.Put(x);
+			pkt.Put(y);
+			pkt.Put(radius);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			state = pkt.Get<uint16_t>();
+			x = pkt.Get<float>();
+			y = pkt.Get<float>();
+			radius = pkt.Get<float>();
+		}
 	};
+
+#pragma pack(push, 1)
 
 	struct TMessage_Header {
 		NOpcode opcode;
 		uint16_t length; // length of the body in bytes
+
+		void Serialize_To(CPacket& pkt) const {
+			pkt.Put(opcode);
+			pkt.Put(length);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			opcode = pkt.Get<NOpcode>();
+			length = pkt.Get<uint16_t>();
+		}
 	};
+
+#pragma pack(pop)
 
 	template<typename TMessage_Body>
 	struct TMessage {
 		TMessage_Header header;
 		TMessage_Body body;
+
+		void Serialize_To(CPacket& pkt) {
+			header.Serialize_To(pkt);
+			body.Serialize_To(pkt);
+
+			header.length = static_cast<uint16_t>(pkt.Get_Raw_Data().size() - sizeof(TMessage_Header));
+			pkt.Put_At(header, 0);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			header.Deserialize_From(pkt);
+			body.Deserialize_From(pkt);
+		}
 	};
 
 	template<>
 	struct TMessage<void> {
 		TMessage_Header header;
-	};
 
-#pragma pack(pop)
+		void Serialize_To(CPacket& pkt) const {
+			header.Serialize_To(pkt);
+		}
+
+		void Deserialize_From(CPacket& pkt) {
+			header.Deserialize_From(pkt);
+		}
+	};
 
 	int Initialize_Networking();
 	int Deinitialize_Networking();

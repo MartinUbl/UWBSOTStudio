@@ -44,11 +44,20 @@ NLib_Result CVSOT_Control_Plugin::Initialize(const char** config_parameters, con
 }
 
 NLib_Result CVSOT_Control_Plugin::Shutdown() {
+
+	if (mSocket != INVALID_SOCKET_VALUE) {
+		closesocket(mSocket);
+		mSocket = INVALID_SOCKET_VALUE;
+	}
+
 	vsot::Deinitialize_Networking();
+
 	return NLib_Result::Success;
 }
 
 NLib_Result CVSOT_Control_Plugin::Set_Robot_Speed(uint16_t robot_idx, uint16_t team_idx, float speed_left, float speed_right) {
+
+	CPacket pkt;
 
 	vsot::TMessage<vsot::TSet_Robot_Speed> message;
 	message.header.opcode = vsot::NOpcode::Set_Robot_Speed;
@@ -59,7 +68,9 @@ NLib_Result CVSOT_Control_Plugin::Set_Robot_Speed(uint16_t robot_idx, uint16_t t
 	message.body.left = speed_left;
 	message.body.right = speed_right;
 
-	int res = send(mSocket, reinterpret_cast<const char*>(&message), sizeof(message), 0);
+	message.Serialize_To(pkt);
+
+	int res = send(mSocket, reinterpret_cast<const char*>(pkt.Get_Raw_Data().data()), pkt.Get_Raw_Data().size(), 0);
 	if (res <= 0) {
 		std::cerr << "Failed to send set robot speed message\n";
 		return NLib_Result::Illegal_State;

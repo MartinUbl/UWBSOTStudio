@@ -48,6 +48,12 @@ NLib_Result CVSOT_Sensing_Plugin::Initialize(const char** config_parameters, con
 }
 
 NLib_Result CVSOT_Sensing_Plugin::Shutdown() {
+
+	if (mSocket != INVALID_SOCKET_VALUE) {
+		closesocket(mSocket);
+		mSocket = INVALID_SOCKET_VALUE;
+	}
+
 	vsot::Deinitialize_Networking();
 
 	return NLib_Result::Success;
@@ -57,13 +63,18 @@ const uint64_t CVSOT_Sensing_Plugin::Get_Logical_Clock() const {
 	return 1;
 }
 
-bool CVSOT_Sensing_Plugin::Send_Metadata_Request(char** response, vsot::NOpcode opcode) const {
-	// request metadata from the environment and parse the response to get the number of teams
+bool CVSOT_Sensing_Plugin::Send_Empty_Request(CPacket& response, vsot::NOpcode opcode) const {
+
+	CPacket pkt;
+
+	// request metadata from the environment
 	vsot::TMessage<void> request;
 	request.header.opcode = opcode;
 	request.header.length = 0;
 
-	int res = send(mSocket, reinterpret_cast<const char*>(&request), sizeof(request), 0);
+	pkt.Put(request);
+
+	int res = send(mSocket, reinterpret_cast<const char*>(pkt.Get_Raw_Data().data()), pkt.Get_Raw_Data().size(), 0);
 	if (res <= 0) {
 		std::cerr << "Failed to send metadata request\n";
 		return false;
@@ -75,74 +86,70 @@ bool CVSOT_Sensing_Plugin::Send_Metadata_Request(char** response, vsot::NOpcode 
 		return false;
 	}
 
-	const size_t body_size = buffer.size() - sizeof(vsot::TMessage_Header);
-
-	char* body_copy = new char[body_size];
-	memcpy(body_copy, buffer.data() + sizeof(request), body_size);
-
-	*response = body_copy;
+	response.assign(buffer);
 
 	return true;
 }
 
 uint16_t CVSOT_Sensing_Plugin::Get_Team_Count() const {
 
-	char* response_raw = nullptr;
+	CPacket response;
 
-	if (!Send_Metadata_Request(&response_raw)) {
+	if (!Send_Empty_Request(response)) {
 		return 0;
 	}
 
-	vsot::TMetadata_Response* response = reinterpret_cast<vsot::TMetadata_Response*>(response_raw);
+	vsot::TMessage<vsot::TMetadata_Response> metadata_response;
+	metadata_response.Deserialize_From(response);
 
-	uint16_t team_count = response->team_count;
-	delete[] reinterpret_cast<char*>(response);
-	return team_count;
+	return static_cast<uint16_t>(metadata_response.body.team_counts.size());
 }
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Team_Sizes(uint16_t** sizes, uint16_t* sizes_count) const {
 
-	char* response_raw = nullptr;
+	CPacket response;
 
-	if (!Send_Metadata_Request(&response_raw)) {
+	if (!Send_Empty_Request(response)) {
 		*sizes_count = 0;
 		return NLib_Result::Illegal_State;
 	}
 
-	vsot::TMetadata_Response* response = reinterpret_cast<vsot::TMetadata_Response*>(response_raw);
+	vsot::TMessage<vsot::TMetadata_Response> metadata_response;
+	metadata_response.Deserialize_From(response);
 
-	*sizes_count = response->team_count;
+	*sizes_count = static_cast<uint16_t>(metadata_response.body.team_counts.size());
 
 	*sizes = new uint16_t[*sizes_count];
 	for (uint16_t i = 0; i < *sizes_count; ++i) {
-		(*sizes)[i] = response->team_counts[i];
+		(*sizes)[i] = metadata_response.body.team_counts[i];
 	}
 	
-	delete[] reinterpret_cast<char*>(response);
 	return NLib_Result::Success;
 }
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Arena_Size(float* width, float* height, float* goal_width) const {
 
-	char* response_raw = nullptr;
+	CPacket response;
 
-	if (!Send_Metadata_Request(&response_raw)) {
+	if (!Send_Empty_Request(response)) {
 		*width = 0.0f;
 		*height = 0.0f;
 		return NLib_Result::Illegal_State;
 	}
 
-	vsot::TMetadata_Response* response = reinterpret_cast<vsot::TMetadata_Response*>(response_raw);
+	vsot::TMessage<vsot::TMetadata_Response> metadata_response;
+	metadata_response.Deserialize_From(response);
 
-	*width = response->arena_width;
-	*height = response->arena_height;
-	*goal_width = response->goal_width;
+	*width = metadata_response.body.arena_width;
+	*height = metadata_response.body.arena_height;
+	*goal_width = metadata_response.body.goal_width;
 
-	delete[] reinterpret_cast<char*>(response);
 	return NLib_Result::Success;
 }
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** positions, uint16_t* positions_count, uint16_t team_idx) {
+
+	CPacket pkt;
 
 	vsot::TMessage<vsot::TRefresh_Positions_Request> request;
 	request.header.opcode = vsot::NOpcode::Refresh_Positions_Request;
@@ -150,7 +157,9 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** position
 	request.body.robot_idx = Robot_Idx_Any;
 	request.body.team_idx = team_idx;
 
-	int res = send(mSocket, reinterpret_cast<const char*>(&request), sizeof(request), 0);
+	request.Serialize_To(pkt);
+
+	int res = send(mSocket, reinterpret_cast<const char*>(pkt.Get_Raw_Data().data()), pkt.Get_Raw_Data().size(), 0);
 	if (res <= 0) {
 		std::cerr << "Failed to send refresh positions request\n";
 		return NLib_Result::Illegal_State;
@@ -159,27 +168,32 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Robot_Positions(TRobot_Position** position
 	std::vector<char> buffer(1024);
 	vsot::Receive_Message(mSocket, buffer);
 
-	vsot::TRefresh_Positions_Response* response = reinterpret_cast<vsot::TRefresh_Positions_Response*>(buffer.data() + sizeof(vsot::TMessage_Header));
+	CPacket response(buffer);
 
-	*positions_count = response->robot_count;
+	vsot::TMessage<vsot::TRefresh_Positions_Response> response_body;
+	response_body.Deserialize_From(response);
+
+	*positions_count = static_cast<uint16_t>(response_body.body.positions.size());
 	*positions = new TRobot_Position[*positions_count];
 
 	mCached_Robot_Positions.clear();
-	for (uint16_t i = 0; i < *positions_count; ++i) {
-		(*positions)[i].robot_idx = response->positions[i].robot_idx;
-		(*positions)[i].x = response->positions[i].x;
-		(*positions)[i].y = response->positions[i].y;
-		(*positions)[i].orientation = response->positions[i].orientation;
-		(*positions)[i].team_idx = response->positions[i].team_idx;
-		mCached_Robot_Positions.push_back({response->positions[i].x, response->positions[i].y, response->positions[i].team_idx});
+	for (uint16_t i = 0; i < response_body.body.positions.size(); ++i) {
+		(*positions)[i].robot_idx = response_body.body.positions[i].robot_idx;
+		(*positions)[i].x = response_body.body.positions[i].x;
+		(*positions)[i].y = response_body.body.positions[i].y;
+		(*positions)[i].orientation = response_body.body.positions[i].orientation;
+		(*positions)[i].team_idx = response_body.body.positions[i].team_idx;
+		mCached_Robot_Positions.push_back({ response_body.body.positions[i].x, response_body.body.positions[i].y, response_body.body.positions[i].team_idx });
 	}
 
 	return NLib_Result::Success;
 }
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Ball_Position(NBall_State* state, float* x, float* y, float* radius) {
-	char* response_raw = nullptr;
-	if (!Send_Metadata_Request(&response_raw, vsot::NOpcode::Ball_Position_Request)) {
+
+	CPacket response;
+
+	if (!Send_Empty_Request(response, vsot::NOpcode::Ball_Position_Request)) {
 		*state = NBall_State::Not_Found;
 		*x = 0.0f;
 		*y = 0.0f;
@@ -187,24 +201,27 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Ball_Position(NBall_State* state, float* x
 		return NLib_Result::Illegal_State;
 	}
 
-	vsot::TBall_Position_Response* response = reinterpret_cast<vsot::TBall_Position_Response*>(response_raw);
+	vsot::TMessage<vsot::TBall_Position_Response> response_body;
+	response_body.Deserialize_From(response);
 
-	*state = static_cast<NBall_State>(response->state);
-	*x = response->x;
-	*y = response->y;
-	*radius = response->radius;
+	*state = static_cast<NBall_State>(response_body.body.state);
+	*x = response_body.body.x;
+	*y = response_body.body.y;
+	*radius = response_body.body.radius;
 
-	mCached_Ball_Position.state = static_cast<NBall_State>(response->state);
-	mCached_Ball_Position.x = response->x;
-	mCached_Ball_Position.y = response->y;
-	mCached_Ball_Position.radius = response->radius;
-
-	delete[] reinterpret_cast<char*>(response);
+	mCached_Ball_Position.state = static_cast<NBall_State>(response_body.body.state);
+	mCached_Ball_Position.x = response_body.body.x;
+	mCached_Ball_Position.y = response_body.body.y;
+	mCached_Ball_Position.radius = response_body.body.radius;
 
 	return NLib_Result::Success;
 }
 
 namespace {
+
+#pragma warning(push)
+#pragma warning(disable: 4838) // disable warning for narrowing conversions (for convenience)
+
 	const char letter_V[] = {
 		0b10000001,
 		0b10000001,
@@ -278,6 +295,8 @@ namespace {
 		0b01000010,
 		0b00000000
 	};
+
+#pragma warning(pop)
 }
 
 NLib_Result CVSOT_Sensing_Plugin::Get_Camera_Image(void* rgbaPixels, int* width, int* height) {

@@ -30,7 +30,7 @@ class CVSOT_Sensing_Plugin : public ISensing_Plugin {
 		TCached_Ball_Position mCached_Ball_Position;
 
 	protected:
-		bool Send_Metadata_Request(char** response, vsot::NOpcode opcode = vsot::NOpcode::Metadata_Request) const;
+		bool Send_Empty_Request(CPacket& response, vsot::NOpcode opcode = vsot::NOpcode::Metadata_Request) const;
 
 	public:
 		// IPlugin iface
