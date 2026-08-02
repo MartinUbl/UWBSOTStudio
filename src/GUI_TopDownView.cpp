@@ -20,6 +20,16 @@ void CStudio_GUI::Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size) {
 	// arena outline based on mArena_Width and mArena_Height
 	ImGui::GetWindowDrawList()->AddRect(arenaOffset, ImVec2(arenaOffset.x + mArena_Width * factorX, arenaOffset.y + mArena_Height * factorY), IM_COL32(255, 255, 255, 255), 0.0f, 0, 2.0f);
 
+	// draw the goals on the left and right sides of the arena (in the middle of the height)
+	ImVec2 leftGoalTop(arenaOffset.x - 4, arenaOffset.y + (mArena_Height * factorY - mGoal_Width * factorY) / 2.0f);
+	ImVec2 leftGoalBottom(arenaOffset.x + 2, arenaOffset.y + (mArena_Height * factorY + mGoal_Width * factorY) / 2.0f);
+
+	ImVec2 rightGoalTop(arenaOffset.x + mArena_Width * factorX - 2, arenaOffset.y + (mArena_Height * factorY - mGoal_Width * factorY) / 2.0f);
+	ImVec2 rightGoalBottom(arenaOffset.x + mArena_Width * factorX + 4, arenaOffset.y + (mArena_Height * factorY + mGoal_Width * factorY) / 2.0f);
+
+	ImGui::GetWindowDrawList()->AddRectFilled(leftGoalTop, leftGoalBottom, IM_COL32(128, 0, 0, 255));
+	ImGui::GetWindowDrawList()->AddRectFilled(rightGoalTop, rightGoalBottom, IM_COL32(128, 0, 0, 255));
+
 	for (const auto& pos : mRobot_Positions) {
 		ImVec2 robotPos(arenaOffset.x + pos.x * factorX, arenaOffset.y + pos.y * factorY);
 
@@ -62,5 +72,5 @@ void CStudio_GUI::Draw_Scaled_TopDown_Arena(ImVec2 cursorPos, ImVec2 size) {
 
 	// draw the ball
 	ImVec2 ballPos(arenaOffset.x + mBall.x * factorX, arenaOffset.y + mBall.y * factorY);
-	ImGui::GetWindowDrawList()->AddCircleFilled(ballPos, mBall.radius * factorX, IM_COL32(255, 92, 0, 255));
+	ImGui::GetWindowDrawList()->AddCircleFilled(ballPos, mBall.radius * factorX, mBall.state == NBall_State::Ground ? IM_COL32(255, 92, 0, 255) : IM_COL32(127, 127, 64, 255));
 }

@@ -122,7 +122,7 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Team_Sizes(uint16_t** sizes, uint16_t* siz
 	return NLib_Result::Success;
 }
 
-NLib_Result CVSOT_Sensing_Plugin::Get_Arena_Size(float* width, float* height) const {
+NLib_Result CVSOT_Sensing_Plugin::Get_Arena_Size(float* width, float* height, float* goal_width) const {
 
 	char* response_raw = nullptr;
 
@@ -136,6 +136,7 @@ NLib_Result CVSOT_Sensing_Plugin::Get_Arena_Size(float* width, float* height) co
 
 	*width = response->arena_width;
 	*height = response->arena_height;
+	*goal_width = response->goal_width;
 
 	delete[] reinterpret_cast<char*>(response);
 	return NLib_Result::Success;

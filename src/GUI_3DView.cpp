@@ -154,6 +154,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		ImVec2 size;
 		float arena_width;
 		float arena_height;
+		float goal_width;
 		float view_rotation;
 		float view_elevation;
 		float view_zoom;
@@ -170,6 +171,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 	render_data.size = size;
 	render_data.arena_width = mArena_Width;
 	render_data.arena_height = mArena_Height;
+	render_data.goal_width = mGoal_Width;
 	render_data.view_rotation = mArena3D_View_Rotation;
 	render_data.view_elevation = mArena3D_View_Elevation;
 	render_data.view_zoom = mArena3D_View_Zoom;
@@ -437,6 +439,7 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 			constexpr int Rings = 12;
 			constexpr int Segments = 24;
 			const ImVec4 orange(1.0f, 0.36f, 0.0f, 1.0f);
+			const ImVec4 liftedgray(0.5f, 0.5f, 0.25f, 1.0f);
 
 			for (int ring = 0; ring < Rings; ++ring) {
 				const float theta0 = static_cast<float>(ring) * Pi / static_cast<float>(Rings);
@@ -452,10 +455,10 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 					const float cos_phi = std::cos(phi);
 					const float sin_phi = std::sin(phi);
 
-					set_color(orange, 0.72f + 0.28f * std::max(0.0f, z0));
+					set_color(data->ball_state == NBall_State::Ground ? orange : liftedgray, 0.72f + 0.28f * std::max(0.0f, z0));
 					glVertex3f(radius * xy0 * cos_phi, radius * xy0 * sin_phi, radius * z0);
 
-					set_color(orange, 0.72f + 0.28f * std::max(0.0f, z1));
+					set_color(data->ball_state == NBall_State::Ground ? orange : liftedgray, 0.72f + 0.28f * std::max(0.0f, z1));
 					glVertex3f(radius * xy1 * cos_phi, radius * xy1 * sin_phi, radius * z1);
 				}
 				glEnd();
@@ -493,10 +496,24 @@ void CStudio_GUI::Draw_3D_Arena(ImVec2 cursorPos, ImVec2 size)
 		glEnd();
 
 		const ImVec4 margin_color(0.62f, 0.66f, 0.72f, 1.0f);
+		const ImVec4 goal_color(0.50f, 0.0f, 0.0f, 1.0f);
+		const float goal_height = Margin_Size * 0.4f;
+		const float goal_min_y = std::clamp((data->arena_height - data->goal_width) * 0.5f, 0.0f, data->arena_height);
+		const float goal_max_y = std::clamp((data->arena_height + data->goal_width) * 0.5f, 0.0f, data->arena_height);
 		draw_box(-Margin_Size, -Margin_Size, 0.0f, data->arena_width + Margin_Size, 0.0f, Margin_Size, margin_color);
 		draw_box(-Margin_Size, data->arena_height, 0.0f, data->arena_width + Margin_Size, data->arena_height + Margin_Size, Margin_Size, margin_color);
-		draw_box(-Margin_Size, 0.0f, 0.0f, 0.0f, data->arena_height, Margin_Size, margin_color);
-		draw_box(data->arena_width, 0.0f, 0.0f, data->arena_width + Margin_Size, data->arena_height, Margin_Size, margin_color);
+		if (data->goal_width > 0.0f && goal_min_y < goal_max_y) {
+			draw_box(-Margin_Size, 0.0f, 0.0f, 0.0f, goal_min_y, Margin_Size, margin_color);
+			draw_box(-Margin_Size, goal_max_y, 0.0f, 0.0f, data->arena_height, Margin_Size, margin_color);
+			draw_box(data->arena_width, 0.0f, 0.0f, data->arena_width + Margin_Size, goal_min_y, Margin_Size, margin_color);
+			draw_box(data->arena_width, goal_max_y, 0.0f, data->arena_width + Margin_Size, data->arena_height, Margin_Size, margin_color);
+			draw_box(-Margin_Size, goal_min_y, 0.0f, 0.0f, goal_max_y, goal_height, goal_color);
+			draw_box(data->arena_width, goal_min_y, 0.0f, data->arena_width + Margin_Size, goal_max_y, goal_height, goal_color);
+		}
+		else {
+			draw_box(-Margin_Size, 0.0f, 0.0f, 0.0f, data->arena_height, Margin_Size, margin_color);
+			draw_box(data->arena_width, 0.0f, 0.0f, data->arena_width + Margin_Size, data->arena_height, Margin_Size, margin_color);
+		}
 
 		if (data->ball_state != NBall_State::Not_Found && data->ball_radius > 0.0f) {
 			glPushMatrix();

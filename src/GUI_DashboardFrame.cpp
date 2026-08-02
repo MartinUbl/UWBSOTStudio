@@ -60,8 +60,8 @@ void CStudio_GUI::Frame_Dashboard()
 		mLast_Update_Time = TClock::now();
 		if (mSensing_Plugin_Instance) {
 
-			if (mArena_Width == 0 || mArena_Height == 0) {
-				mSensing_Plugin_Instance->Get_Arena_Size(&mArena_Width, &mArena_Height);
+			if (mArena_Width == 0 || mArena_Height == 0 || mGoal_Width == 0) {
+				mSensing_Plugin_Instance->Get_Arena_Size(&mArena_Width, &mArena_Height, &mGoal_Width);
 			}
 
 			TRobot_Position* pos;
@@ -100,7 +100,7 @@ void CStudio_GUI::Frame_Dashboard()
 			try {
 				mPython_Runtime->Update_All();
 			}
-			catch (py::error_already_set& e) {
+			catch (std::exception& e) {
 				std::cerr << "Error updating Python scripts: " << e.what() << std::endl;
 				Log_Message(NLog_Severity::Error, "Python", e.what());
 			}

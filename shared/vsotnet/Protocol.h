@@ -72,6 +72,7 @@ namespace vsot {
 	struct TMetadata_Response {
 		float arena_width;
 		float arena_height;
+		float goal_width;
 		uint16_t team_count;
 		uint16_t team_counts[0]; // flexible array member
 	};

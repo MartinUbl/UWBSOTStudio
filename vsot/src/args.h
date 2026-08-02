@@ -16,6 +16,9 @@ struct TCLI_Args {
 	// --arena-height <float>, or -h <float>
 	float arena_height = 0.0f;
 
+	// --goal-width <float>, or -g <float>
+	float goal_width = 40.0f;
+
 	// --listen-host <string>, or -l <string>
 	std::string host = "localhost";
 	// --listen-port <int>, or -p <int>

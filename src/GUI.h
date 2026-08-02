@@ -93,6 +93,7 @@ class CStudio_GUI {
 
 		float mArena_Width = 0.0f;
 		float mArena_Height = 0.0f;
+		float mGoal_Width = 0.0f;
 
 		float mArena3D_View_Rotation = 45.0f;
 		float mArena3D_View_Elevation = 35.264f;

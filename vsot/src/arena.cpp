@@ -6,6 +6,8 @@
 
 #include <uwbsot/PluginInterface.h>
 
+#include <spdlog/spdlog.h>
+
 CArena::CArena(const TCLI_Args& args) : mArgs(args) {
 	mNetwork = std::make_unique<CNetwork>(args);
 }
@@ -24,6 +26,8 @@ bool CArena::Start() {
 
 	b2BodyId arenaBody = b2CreateBody(mWorld_Id, &bodyDef);
 
+	mWalls.body_id = arenaBody;
+
 	b2ShapeDef shapeDef = b2DefaultShapeDef();
 	shapeDef.material.friction = 0.3f;
 	shapeDef.material.restitution = 0.2f;
@@ -37,7 +41,7 @@ bool CArena::Start() {
 		b2Vec2(mArgs.arena_width * 0.5f, -halfWall),
 		noRotation
 	);
-	b2CreatePolygonShape(arenaBody, &shapeDef, &bottomWall);
+	mWalls.bottom = b2CreatePolygonShape(arenaBody, &shapeDef, &bottomWall);
 
 	// Top wall: just above y = mArena_Height
 	b2Polygon topWall = b2MakeOffsetBox(
@@ -46,7 +50,7 @@ bool CArena::Start() {
 		b2Vec2(mArgs.arena_width * 0.5f, mArgs.arena_height + halfWall),
 		noRotation
 	);
-	b2CreatePolygonShape(arenaBody, &shapeDef, &topWall);
+	mWalls.top = b2CreatePolygonShape(arenaBody, &shapeDef, &topWall);
 
 	// Left wall: just left of x = 0
 	b2Polygon leftWall = b2MakeOffsetBox(
@@ -55,7 +59,7 @@ bool CArena::Start() {
 		b2Vec2(-halfWall, mArgs.arena_height * 0.5f),
 		noRotation
 	);
-	b2CreatePolygonShape(arenaBody, &shapeDef, &leftWall);
+	mWalls.left = b2CreatePolygonShape(arenaBody, &shapeDef, &leftWall);
 
 	// Right wall: just right of x = mArena_Width
 	b2Polygon rightWall = b2MakeOffsetBox(
@@ -64,18 +68,44 @@ bool CArena::Start() {
 		b2Vec2(mArgs.arena_width + halfWall, mArgs.arena_height * 0.5f),
 		noRotation
 	);
-	b2CreatePolygonShape(arenaBody, &shapeDef, &rightWall);
+	mWalls.right = b2CreatePolygonShape(arenaBody, &shapeDef, &rightWall);
 
 
 	float cursor_x = 15.0f;
 	float cursor_y = 0.0f;
 
 	for (size_t i = 0; i < mArgs.teams; i++) {
-		cursor_y = 15.0f;
-		cursor_x += 15.0f;
+		if (i == 0) {
+			cursor_y = 15.0f;
+		}
+		else if (i == 1) {
+			cursor_y = mArgs.arena_height - 15.0f;
+		}
+		else {
+			cursor_y = 15.0f + (i - 1) * 15.0f;
+		}
+
+		if (i == 0) {
+			cursor_x = 15.0f;
+		}
+		else if (i == 1) {
+			cursor_x = mArgs.arena_width - 15.0f;
+		}
+		else {
+			cursor_x = 15.0f + (i - 1) * 15.0f;
+		}
+
 		for (size_t j = 0; j < mArgs.robots_per_team; j++) {
-			mRobots.emplace_back(static_cast<uint16_t>(j), static_cast<uint16_t>(i), cursor_x, cursor_y, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-			cursor_y += 15.0f;
+			mRobots.emplace_back(static_cast<uint16_t>(j), static_cast<uint16_t>(i), cursor_x, cursor_y, (i == 1) ? std::numbers::pi : 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+			if (i == 0) {
+				cursor_y += 15.0f;
+			}
+			else if (i == 1) {
+				cursor_y -= 15.0f;
+			}
+			else {
+				cursor_y += 15.0f;
+			}
 		}
 	}
 
@@ -146,11 +176,14 @@ void CArena::Create_Ball() {
 	// Moderately bouncy. Increase toward 1.0 for stronger bouncing.
 	shapeDef.material.restitution = 0.65f;
 
+	shapeDef.enableContactEvents = true;
+	shapeDef.enableHitEvents = true;
+
 	b2Circle circle{};
 	circle.center = b2Vec2(0.0f, 0.0f);
 	circle.radius = mBall.radius;
 
-	b2CreateCircleShape(
+	mBall.shape_id = b2CreateCircleShape(
 		mBall.body_id,
 		&shapeDef,
 		&circle
@@ -233,6 +266,19 @@ void CArena::Synchronize_Ball() {
 
 	mBall.x = position.x;
 	mBall.y = position.y;
+
+	// guard against the ball being outside the arena bounds, if outside, reset to center
+	if (mBall.x < 0.0f || mBall.x > mArgs.arena_width || mBall.y < 0.0f || mBall.y > mArgs.arena_height) {
+		spdlog::info("Ball out of bounds at {:.3f}, {:.3f}. Resetting to center.", mBall.x, mBall.y);
+		Reset_Ball_Position();
+	}
+}
+
+void CArena::Reset_Ball_Position() {
+	mBall.x = mArgs.arena_width * 0.5f;
+	mBall.y = mArgs.arena_height * 0.5f;
+	b2Body_SetTransform(mBall.body_id, b2Vec2(mBall.x, mBall.y), b2Body_GetRotation(mBall.body_id));
+	b2Body_SetLinearVelocity(mBall.body_id, b2Vec2(0.0f, 0.0f));
 }
 
 void CArena::Synchronize_Robot_State(TArena_Robot& robot)
@@ -249,6 +295,60 @@ void CArena::Synchronize_Robot_State(TArena_Robot& robot)
 	robot.x = position.x;
 	robot.y = position.y;
 	robot.orientation = b2Rot_GetAngle(rotation);
+}
+
+bool CArena::Is_Arena_Wall(b2ShapeId shapeId)
+{
+	return B2_ID_EQUALS(shapeId, mWalls.bottom) ||
+		B2_ID_EQUALS(shapeId, mWalls.top) ||
+		B2_ID_EQUALS(shapeId, mWalls.left) ||
+		B2_ID_EQUALS(shapeId, mWalls.right);
+}
+
+void CArena::On_Ball_Hit_Wall(b2ShapeId wallShape) {
+
+	if (B2_ID_EQUALS(wallShape, mWalls.left)) {
+		if (mBall.y >= (mArgs.arena_height - mArgs.goal_width) * 0.5f && mBall.y <= (mArgs.arena_height + mArgs.goal_width) * 0.5f) {
+			spdlog::info("Goal scored LEFT!");
+			Reset_Ball_Position();
+		}
+	}
+	else if (B2_ID_EQUALS(wallShape, mWalls.right)) {
+		if (mBall.y >= (mArgs.arena_height - mArgs.goal_width) * 0.5f && mBall.y <= (mArgs.arena_height + mArgs.goal_width) * 0.5f) {
+			spdlog::info("Goal scored RIGHT!");
+			Reset_Ball_Position();
+		}
+	}
+
+}
+
+void CArena::Process_Ball_Contact_Events() {
+	const b2ContactEvents events =
+		b2World_GetContactEvents(mWorld_Id);
+
+	for (int i = 0; i < events.beginCount; ++i)
+	{
+		const b2ContactBeginTouchEvent& event =
+			events.beginEvents[i];
+
+		const bool ballIsA =
+			B2_ID_EQUALS(event.shapeIdA, mBall.shape_id);
+
+		const bool ballIsB =
+			B2_ID_EQUALS(event.shapeIdB, mBall.shape_id);
+
+		if (!ballIsA && !ballIsB)
+			continue;
+
+		const b2ShapeId otherShape =
+			ballIsA
+			? event.shapeIdB
+			: event.shapeIdA;
+
+		if (Is_Arena_Wall(otherShape)) {
+			On_Ball_Hit_Wall(otherShape);
+		}
+	}
 }
 
 int CArena::Run() {
@@ -273,6 +373,8 @@ void CArena::Update_Robot_Positions(float delta_time) {
 		delta_time,
 		subStepCount
 	);
+
+	Process_Ball_Contact_Events();
 
 	// Read the collision-resolved positions back from Box2D.
 	for (TArena_Robot& robot : mRobots)
@@ -327,7 +429,7 @@ void CArena::On_Metadata_Request(const TWaiting_For_Any& request) {
 		teamCounts.push_back(count);
 	}
 
-	mNetwork->Send_Metadata_Response(request, teamCounts, mArgs.arena_width, mArgs.arena_height);
+	mNetwork->Send_Metadata_Response(request, teamCounts, mArgs.arena_width, mArgs.arena_height, mArgs.goal_width);
 }
 
 void CArena::On_Ball_Position_Request(const TWaiting_For_Any& request) {

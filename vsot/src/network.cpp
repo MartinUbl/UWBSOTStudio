@@ -225,21 +225,23 @@ void CNetwork::Send_Refresh_Positions_Response(const TWaiting_For_Positions& req
 	}
 }
 
-void CNetwork::Send_Metadata_Response(const TWaiting_For_Any& request, const std::vector<uint16_t>& teamCounts, float arenaWidth, float arenaHeight) {
+void CNetwork::Send_Metadata_Response(const TWaiting_For_Any& request, const std::vector<uint16_t>& teamCounts, float arenaWidth, float arenaHeight, float goalWidth) {
 	vsot::TMessage<vsot::TMetadata_Response> response;
 	response.header.opcode = vsot::NOpcode::Metadata_Response;
-	response.header.length = sizeof(uint16_t) /* team_count */ + teamCounts.size() * sizeof(uint16_t) /* team_counts */ + sizeof(float) * 2 /* arena_width and arena_height */;
+	response.header.length = sizeof(uint16_t) /* team_count */ + teamCounts.size() * sizeof(uint16_t) /* team_counts */ + sizeof(float) * 3 /* arena_width, arena_height and goal_width */;
 
 	response.body.team_count = static_cast<uint16_t>(teamCounts.size());
 	response.body.arena_width = arenaWidth;
 	response.body.arena_height = arenaHeight;
+	response.body.goal_width = goalWidth;
 
 	std::vector<uint8_t> buffer(sizeof(vsot::TMessage_Header) + response.header.length);
 	std::copy(reinterpret_cast<const char*>(&response.header), reinterpret_cast<const char*>(&response.header) + sizeof(vsot::TMessage_Header), buffer.begin());
 	std::copy(reinterpret_cast<const char*>(&response.body.arena_width), reinterpret_cast<const char*>(&response.body.arena_width) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header));
 	std::copy(reinterpret_cast<const char*>(&response.body.arena_height), reinterpret_cast<const char*>(&response.body.arena_height) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float));
-	std::copy(reinterpret_cast<const char*>(&response.body.team_count), reinterpret_cast<const char*>(&response.body.team_count) + sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 2);
-	std::copy(reinterpret_cast<const char*>(teamCounts.data()), reinterpret_cast<const char*>(teamCounts.data()) + teamCounts.size() * sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 2 + sizeof(uint16_t));
+	std::copy(reinterpret_cast<const char*>(&response.body.goal_width), reinterpret_cast<const char*>(&response.body.goal_width) + sizeof(float), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 2);
+	std::copy(reinterpret_cast<const char*>(&response.body.team_count), reinterpret_cast<const char*>(&response.body.team_count) + sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 3);
+	std::copy(reinterpret_cast<const char*>(teamCounts.data()), reinterpret_cast<const char*>(teamCounts.data()) + teamCounts.size() * sizeof(uint16_t), buffer.begin() + sizeof(vsot::TMessage_Header) + sizeof(float) * 3 + sizeof(uint16_t));
 
 	spdlog::info("Sending Metadata_Response to {}:{}, bufsize = {}, length = {}, team_count = {}", inet_ntoa(request.src_addr.sin_addr), ntohs(request.src_addr.sin_port), buffer.size(), response.header.length, response.body.team_count);
 

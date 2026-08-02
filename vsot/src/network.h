@@ -58,6 +58,6 @@ class CNetwork {
 		void Set_Callbacks(const TCallbacks& callbacks);
 
 		void Send_Refresh_Positions_Response(const TWaiting_For_Positions& request, const std::vector<vsot::TNet_Robot_Position>& positions);
-		void Send_Metadata_Response(const TWaiting_For_Any& request, const std::vector<uint16_t>& teamCounts, float arenaWidth, float arenaHeight);
+		void Send_Metadata_Response(const TWaiting_For_Any& request, const std::vector<uint16_t>& teamCounts, float arenaWidth, float arenaHeight, float goalWidth);
 		void Send_Ball_Position_Response(const TWaiting_For_Any& request, uint16_t state, float x, float y, float radius);
 };

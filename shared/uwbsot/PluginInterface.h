@@ -133,9 +133,9 @@ class ISensing_Plugin : public IPlugin {
 		virtual NLib_Result Get_Team_Sizes(uint16_t** sizes, uint16_t* sizes_count) const = 0;
 
 		/**
-		 * Retrieves the arena size detected by the sensing plugin. The arena size is represented as a pair of floats (width, height).
+		 * Retrieves the arena size detected by the sensing plugin. The arena size is represented as a pair of floats (width, height) and the goal width as a float
 		 */
-		virtual NLib_Result Get_Arena_Size(float* width, float* height) const = 0;
+		virtual NLib_Result Get_Arena_Size(float* width, float* height, float* goal_width) const = 0;
 
 		/**
 		 * Retrieves the positions of the robots. The positions_count must be obtained through Get_Team_Sizes.

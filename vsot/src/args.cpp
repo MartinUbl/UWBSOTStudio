@@ -42,6 +42,14 @@ TCLI_Args Parse_Args(int argc, char** argv) {
 				throw std::invalid_argument("Missing value for --arena-height");
 			}
 		}
+		else if (arg == "--goal-width" || arg == "-g") {
+			if (i + 1 < argc) {
+				args.goal_width = std::stof(argv[++i]);
+			}
+			else {
+				throw std::invalid_argument("Missing value for --goal-width");
+			}
+		}
 		else if (arg == "--listen-host" || arg == "-l") {
 			if (i + 1 < argc) {
 				args.host = argv[++i];
@@ -74,6 +82,12 @@ TCLI_Args Parse_Args(int argc, char** argv) {
 	}
 	if (args.arena_height <= 0.0f) {
 		throw std::invalid_argument("Arena height must be greater than 0");
+	}
+	if (args.goal_width <= 0.0f) {
+		throw std::invalid_argument("Goal width must be greater than 0");
+	}
+	if (args.goal_width >= args.arena_height) {
+		throw std::invalid_argument("Goal width must be less than arena height");
 	}
 	if (args.port <= 0 || args.port > 65535) {
 		throw std::invalid_argument("Port number must be between 1 and 65535");

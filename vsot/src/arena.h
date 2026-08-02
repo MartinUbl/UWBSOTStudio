@@ -32,6 +32,16 @@ struct TArena_Ball {
 	float radius;
 
 	b2BodyId body_id = b2_nullBodyId;
+	b2ShapeId shape_id = b2_nullShapeId;
+};
+
+struct TArena_Walls {
+	b2BodyId body_id = b2_nullBodyId;
+
+	b2ShapeId bottom = b2_nullShapeId;
+	b2ShapeId top = b2_nullShapeId;
+	b2ShapeId left = b2_nullShapeId;
+	b2ShapeId right = b2_nullShapeId;
 };
 
 class CArena {
@@ -43,6 +53,7 @@ class CArena {
 		b2WorldId mWorld_Id;
 		std::vector<TArena_Robot> mRobots;
 
+		TArena_Walls mWalls;
 		TArena_Ball mBall;
 
 	protected:
@@ -53,6 +64,13 @@ class CArena {
 
 		void Synchronize_Ball();
 		void Synchronize_Robot_State(TArena_Robot& robot);
+
+		void Process_Ball_Contact_Events();
+
+		bool Is_Arena_Wall(b2ShapeId shapeId);
+		void On_Ball_Hit_Wall(b2ShapeId wallShape);
+
+		void Reset_Ball_Position();
 
 	public:
 		CArena(const TCLI_Args& args);
