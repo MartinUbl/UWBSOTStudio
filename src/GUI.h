@@ -11,7 +11,7 @@
 #include <imgui.h>
 
 #include <pybind11/embed.h>
-#include "PythonEngine/Runtime.h"
+#include <uwbsot-python/Runtime.h>
 
 namespace py = pybind11;
 
@@ -63,7 +63,7 @@ struct TBall {
 	float radius = 1.0f;
 };
 
-class CStudio_GUI {
+class CStudio_GUI : public CPython_UWBSOT_API {
 	private:
 		GLFWwindow* mWindow = nullptr;
 		bool mIs_Configured = false;
@@ -126,12 +126,12 @@ class CStudio_GUI {
 		void Draw();
 
 	public: // pybind API
-		int Get_Robot_Count(size_t team_index) const;
-		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id);
-		long long Get_Elapsed_Time_Milliseconds() const;
-		void Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right);
-		py::tuple Get_Robot_Position(size_t team_index, size_t robot_index) const;
-		py::tuple Get_Ball_Position() const;
+		int Get_Robot_Count(size_t team_index) const override;
+		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id) override;
+		long long Get_Elapsed_Time_Milliseconds() const override;
+		void Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right) override;
+		py::tuple Get_Robot_Position(size_t team_index, size_t robot_index) const override;
+		py::tuple Get_Ball_Position() const override;
 
 	private:
 		void Frame_Configuration();

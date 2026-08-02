@@ -62,16 +62,16 @@ FILE(GLOB imgui_src "${imgui_SOURCE_DIR}/*.cpp" "${imgui_SOURCE_DIR}/*.h" "${img
 INCLUDE_DIRECTORIES("${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends/" "${glfw_SOURCE_DIR}/include")
 
 FILE(GLOB_RECURSE src_shared shared/uwbsot/*.cpp shared/uwbsot/*.h shared/uwbsot/*.hpp shared/uwbsot/*.c)
+FILE(GLOB_RECURSE src_python shared/uwbsot-python/*.cpp shared/uwbsot-python/*.h shared/uwbsot-python/*.hpp shared/uwbsot-python/*.c)
 
 INCLUDE_DIRECTORIES("shared/" "${nfd-extended_SOURCE_DIR}/src/include")
 
 SOURCE_GROUP(shared FILES ${src_shared})
+SOURCE_GROUP(shared//uwbsot-python FILES ${src_python})
 
 FILE(GLOB src src/*.cpp src/*.h src/*.hpp src/*.c)
-FILE(GLOB_RECURSE src_python src/PythonEngine/*.cpp src/PythonEngine/*.h src/PythonEngine/*.hpp src/PythonEngine/*.c)
 
 SOURCE_GROUP(src FILES ${src})
-SOURCE_GROUP(src//PythonEngine FILES ${src_python})
 
 ADD_LIBRARY(imgui STATIC ${imgui_src})
 

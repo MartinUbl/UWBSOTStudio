@@ -31,6 +31,15 @@ FetchContent_Declare(box2d
     GIT_TAG "v3.1.1"
 )
 
+SET(PYBIND11_FINDPYTHON ON)
+
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG        v3.0.3
+    GIT_SHALLOW    TRUE
+)
+
 FetchContent_GetProperties(spdlog)
 IF (NOT spdlog_POPULATED)
     FetchContent_Populate(spdlog)
@@ -43,11 +52,17 @@ IF (NOT box2d_POPULATED)
     ADD_SUBDIRECTORY(${box2d_SOURCE_DIR} ${box2d_BINARY_DIR})
 ENDIF()
 
+FetchContent_GetProperties(pybind11)
+IF (NOT pybind11_POPULATED)
+    FetchContent_Populate(pybind11)
+    ADD_SUBDIRECTORY(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
+ENDIF()
+
 ADD_EXECUTABLE(${PROJECT_NAME} ${src} ${src_shared})
 
 IF(WIN32)
 	TARGET_LINK_LIBRARIES(${PROJECT_NAME} Ws2_32)
 ENDIF()
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} spdlog::spdlog box2d)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} spdlog::spdlog box2d pybind11::embed)
 
 CONFIGURE_MAIN_EXECUTABLE(${PROJECT_NAME})
