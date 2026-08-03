@@ -3,6 +3,7 @@
 #include "Script.h"
 
 #include <pybind11/embed.h>
+#include <pybind11/subinterpreter.h>
 
 #include <filesystem>
 #include <memory>
@@ -71,12 +72,13 @@ class CPython_UWBSOT_API {
  */
 class CPython_Runtime {
 	private:
-		py::scoped_interpreter mInterpreter;
+		py::subinterpreter mSubInterpreter;
 
 		std::vector<std::unique_ptr<CPython_Script>> mScripts;
 
 	public:
 		explicit CPython_Runtime(const std::filesystem::path& scriptsDirectory);
+		~CPython_Runtime();
 
 		CPython_Runtime(const CPython_Runtime&) = delete;
 		CPython_Runtime& operator=(const CPython_Runtime&) = delete;
@@ -85,13 +87,18 @@ class CPython_Runtime {
 		 * Create a controller script instance for a given script name and team index.
 		 * Returns a reference to the created CPython_Script instance.
 		 */
-		CPython_Script& Create_Controller_Script(const std::string& scriptName, uint16_t team_index);
+		CPython_Script& Create_Controller_Script(const std::string& scriptName, uint16_t team_index, bool initialize = false);
 
 		/**
 		 * Create an agent script instance for a given script name, team index, and robot index.
 		 * Returns a reference to the created CPython_Script instance.
 		 */
-		CPython_Script& Create_Agent_Script(const std::string& scriptName, uint16_t team_index, uint16_t robot_index);
+		CPython_Script& Create_Agent_Script(const std::string& scriptName, uint16_t team_index, uint16_t robot_index, bool initialize = false);
+
+		/**
+		 * Inject the CPython_UWBSOT_API interface into the Python environment, allowing scripts to interact with the UWB SOT environment.
+		 */
+		void Inject_API(CPython_UWBSOT_API& api);
 
 		void Initialize_All();
 		void Update_All();
@@ -103,5 +110,5 @@ class CPython_Runtime {
 		 * Create a script instance for a given script name, team index, and robot index.
 		 * Returns a reference to the created CPython_Script instance.
 		 */
-		CPython_Script& Create_Script(const std::string& scriptName, uint16_t team_index = Team_Idx_Any, uint16_t robot_index = Robot_Idx_Any);
+		CPython_Script& Create_Script(const std::string& scriptName, uint16_t team_index = Team_Idx_Any, uint16_t robot_index = Robot_Idx_Any, bool initialize = false);
 };

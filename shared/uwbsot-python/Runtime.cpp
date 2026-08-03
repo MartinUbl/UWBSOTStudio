@@ -3,8 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-CPython_Runtime::CPython_Runtime(const std::filesystem::path& scriptsDirectory)
-	: mInterpreter{ } {
+CPython_Runtime::CPython_Runtime(const std::filesystem::path& scriptsDirectory) : mSubInterpreter{ py::subinterpreter::create() } {
 
 	const std::filesystem::path absolutePath = std::filesystem::absolute(scriptsDirectory);
 
@@ -12,14 +11,23 @@ CPython_Runtime::CPython_Runtime(const std::filesystem::path& scriptsDirectory)
 		throw std::runtime_error("Python script directory does not exist: " + absolutePath.string());
 	}
 
+	py::subinterpreter_scoped_activate guard(mSubInterpreter);
+
 	py::module_ sys = py::module_::import("sys");
 
 	sys.attr("path").attr("insert")(0, absolutePath.string());
 }
 
-CPython_Script& CPython_Runtime::Create_Script(const std::string& scriptName, uint16_t team_index, uint16_t robot_index) {
+CPython_Runtime::~CPython_Runtime() {
+	py::subinterpreter_scoped_activate guard(mSubInterpreter);
+	mScripts.clear();
+}
+
+CPython_Script& CPython_Runtime::Create_Script(const std::string& scriptName, uint16_t team_index, uint16_t robot_index, bool initialize) {
 
 	try {
+		py::subinterpreter_scoped_activate guard(mSubInterpreter);
+
 		py::module_ module = py::module_::import(scriptName.c_str());
 
 		const std::string className = (robot_index == Robot_Idx_Any) ? "Controller" : "Agent";
@@ -43,6 +51,10 @@ CPython_Script& CPython_Runtime::Create_Script(const std::string& scriptName, ui
 
 		auto script = std::make_unique<CPython_Script>(scriptName, std::move(instance));
 
+		if (initialize) {
+			script->Initialize(mSubInterpreter);
+		}
+
 		CPython_Script& result = *script;
 		mScripts.push_back(std::move(script));
 
@@ -53,15 +65,28 @@ CPython_Script& CPython_Runtime::Create_Script(const std::string& scriptName, ui
 	}
 }
 
-CPython_Script& CPython_Runtime::Create_Controller_Script(const std::string& scriptName, uint16_t team_index) {
-	return Create_Script(scriptName, team_index);
+CPython_Script& CPython_Runtime::Create_Controller_Script(const std::string& scriptName, uint16_t team_index, bool initialize) {
+	return Create_Script(scriptName, team_index, Robot_Idx_Any, initialize);
 }
 
-CPython_Script& CPython_Runtime::Create_Agent_Script(const std::string& scriptName, uint16_t team_index, uint16_t robot_index) {
-	return Create_Script(scriptName, team_index, robot_index);
+CPython_Script& CPython_Runtime::Create_Agent_Script(const std::string& scriptName, uint16_t team_index, uint16_t robot_index, bool initialize) {
+	return Create_Script(scriptName, team_index, robot_index, initialize);
+}
+
+void CPython_Runtime::Inject_API(CPython_UWBSOT_API& api) {
+	py::subinterpreter_scoped_activate guard(mSubInterpreter);
+
+	py::module_ env_module = py::module_::import("env");
+
+	env_module.attr("control") = py::cast(
+		&api,
+		py::return_value_policy::reference
+	);
 }
 
 void CPython_Runtime::Initialize_All() {
+	py::subinterpreter_scoped_activate guard(mSubInterpreter);
+
 	for (const auto& script : mScripts) {
 		try {
 			script->Initialize();
@@ -73,6 +98,8 @@ void CPython_Runtime::Initialize_All() {
 }
 
 void CPython_Runtime::Update_All() {
+	py::subinterpreter_scoped_activate guard(mSubInterpreter);
+
 	for (const auto& script : mScripts) {
 		try {
 			script->Update();

@@ -51,6 +51,7 @@ struct TArena_Walls {
 class CArena : public CPython_UWBSOT_API {
 	private:
 		TCLI_Args mArgs;
+		size_t mId = 0;
 
 		std::unique_ptr<CNetwork> mNetwork;
 
@@ -64,6 +65,13 @@ class CArena : public CPython_UWBSOT_API {
 
 		std::unique_ptr<CPython_Runtime> mPython_Runtime;
 		std::vector<TScript_Entry> mScript_List;
+
+		std::vector<int> mTeam_Scores;
+
+		bool mRunning;
+
+		std::chrono::duration<long long, std::milli> mPhysics_Step_Duration;
+		float mPhysics_Step_Duration_Frac = 0.0f;
 
 	protected:
 		void Create_Ball();
@@ -84,6 +92,8 @@ class CArena : public CPython_UWBSOT_API {
 	protected:
 		void Init_Simulation();
 
+		bool Check_Win();
+
 	public: // pybind API
 		int Get_Robot_Count(size_t team_index) const override;
 		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id) override;
@@ -93,9 +103,10 @@ class CArena : public CPython_UWBSOT_API {
 		py::tuple Get_Ball_Position() const override;
 
 	public:
-		CArena(const TCLI_Args& args);
+		CArena(const TCLI_Args& args, size_t id = 0);
 
 		bool Start();
+		bool Stop();
 		int Run();
 
 		void Update_Robot_Positions(float delta_time);

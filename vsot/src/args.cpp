@@ -59,6 +59,21 @@ controllers[1]=ctl-mixed
 			else if (key == "scripts-directory") {
 				args.scripts_directory = value;
 			}
+			else if (key == "thread-count") {
+				args.thread_count = std::stoi(value);
+			}
+			else if (key == "resolution-ms") {
+				args.resolution_ms = std::stoi(value);
+			}
+			else if (key == "arena-width") {
+				args.arena_width = std::stof(value);
+			}
+			else if (key == "arena-height") {
+				args.arena_height = std::stof(value);
+			}
+			else if (key == "goal-width") {
+				args.goal_width = std::stof(value);
+			}
 			else if (key.find("controllers[") == 0) {
 				// Extract the index
 				size_t start = key.find('[') + 1;
@@ -156,6 +171,14 @@ TCLI_Args Parse_Args(int argc, char** argv) {
 				throw std::invalid_argument("Missing value for --simulation-config");
 			}
 		}
+		else if (arg == "--resolution-ms" || arg == "-R") {
+			if (i + 1 < argc) {
+				args.resolution_ms = std::stoi(argv[++i]);
+			}
+			else {
+				throw std::invalid_argument("Missing value for --resolution-ms");
+			}
+		}
 		else {
 			throw std::invalid_argument("Unknown argument: " + arg);
 		}
@@ -190,6 +213,9 @@ TCLI_Args Parse_Args(int argc, char** argv) {
 	}
 	if (args.host.empty()) {
 		throw std::invalid_argument("Host cannot be empty");
+	}
+	if (args.resolution_ms <= 0) {
+		throw std::invalid_argument("Resolution must be greater than 0");
 	}
 
 	return args;

@@ -292,8 +292,7 @@ void CStudio_GUI::Frame_Dashboard()
 					auto fname = script.path.filename().stem().string();
 
 					try {
-						auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index);
-						ctl.Initialize();
+						auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index, true);
 						Log_Message(NLog_Severity::Info, "Python", "Loaded controller script: " + fname + " for team " + std::to_string(team_index));
 					}
 					catch (py::error_already_set& e) {
@@ -389,14 +388,11 @@ void CStudio_GUI::Frame_Dashboard()
 
 void CStudio_GUI::Refresh_Script_List(const std::filesystem::path& script_directory)
 {
+	py::initialize_interpreter();
+
 	mPython_Runtime = std::make_unique<CPython_Runtime>(script_directory);
 
-	py::module_ env_module = py::module_::import("env");
-
-	env_module.attr("control") = py::cast(
-		this,
-		py::return_value_policy::reference
-	);
+	mPython_Runtime->Inject_API(*this);
 
 	CPython_Runtime::Load_Script_List(script_directory, mScript_List);
 }
@@ -464,7 +460,7 @@ void CStudio_GUI::Set_Robot_Script(size_t team_index, size_t robot_index, const 
 
 		mRobot_Cached_Info[targetIdx].scriptName = it->name;
 
-		mPython_Runtime->Create_Agent_Script(it->path.filename().stem().string(), static_cast<uint16_t>(team_index), static_cast<uint16_t>(robot_index)).Initialize();
+		mPython_Runtime->Create_Agent_Script(it->path.filename().stem().string(), static_cast<uint16_t>(team_index), static_cast<uint16_t>(robot_index), true);
 		Log_Message(NLog_Severity::Info, "Python", "Assigned script '" + it->name + "' to team " + std::to_string(team_index) + ", robot " + std::to_string(robot_index));
 	}
 	catch (py::error_already_set& e) {
@@ -519,7 +515,7 @@ py::tuple CStudio_GUI::Get_Ball_Position() const {
 	return py::make_tuple(mBall.x, mBall.y, mBall.radius);
 }
 
-PYBIND11_EMBEDDED_MODULE(env, m)
+PYBIND11_EMBEDDED_MODULE(env, m, py::multiple_interpreters::per_interpreter_gil())
 {
 	py::class_<CStudio_GUI>(m, "env")
 		.def(

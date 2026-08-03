@@ -28,6 +28,8 @@ struct TCLI_Args {
 	// --simulation-config <string> or -s <string>
 	std::string simulation_config;
 
+	// --resolution-ms <int> or -R <int>
+	int resolution_ms = 5;
 
 
 	// the following parameters will be loaded from the simulation config, if provided
@@ -36,6 +38,7 @@ struct TCLI_Args {
 	int win_points = 0;
 	std::vector<std::string> controllers;
 	std::string scripts_directory;
+	int thread_count = 1;
 };
 
 /**

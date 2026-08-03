@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pybind11/embed.h>
+#include <pybind11/subinterpreter.h>
 
 #include <filesystem>
 #include <string>
@@ -17,6 +18,9 @@ class CPython_Script {
 		std::string mScript_Name;
 		py::object mInstance;
 
+		py::detail::str_attr_accessor mInitialize_Method;
+		py::detail::str_attr_accessor mUpdate_Method;
+
 	public:
 		explicit CPython_Script(std::string scriptName, py::object instance);
 
@@ -29,10 +33,20 @@ class CPython_Script {
 		/**
 		 * Initialize the script by calling its initialize() method
 		 */
+		void Initialize(py::subinterpreter& subinterpreter);
+
+		/**
+		 * Initialize the script by calling its initialize() method without a subinterpreter
+		 */
 		void Initialize();
 
 		/**
 		 * Update the script by calling its update() method
+		 */
+		void Update(py::subinterpreter& subinterpreter);
+
+		/**
+		 * Update the script by calling its update() method without a subinterpreter
 		 */
 		void Update();
 		

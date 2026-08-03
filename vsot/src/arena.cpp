@@ -8,10 +8,15 @@
 
 #include <spdlog/spdlog.h>
 
-CArena::CArena(const TCLI_Args& args) : mArgs(args) {
+CArena::CArena(const TCLI_Args& args, size_t id)
+	: mArgs(args), mId(id), mRunning{ false },
+	  mPhysics_Step_Duration(std::chrono::milliseconds(args.resolution_ms)),
+	  mPhysics_Step_Duration_Frac(static_cast<float>(args.resolution_ms) / 1000.0f) {
 	if (!mArgs.is_simulation) {
 		mNetwork = std::make_unique<CNetwork>(args);
 	}
+
+	mTeam_Scores.resize(mArgs.teams);
 }
 
 bool CArena::Start() {
@@ -122,6 +127,8 @@ bool CArena::Start() {
 
 	Create_Ball();
 
+	mRunning = true;
+
 	if (!mArgs.is_simulation) {
 		mNetwork->Set_Callbacks({
 			std::bind(&CArena::On_Speed_Set, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4),
@@ -141,15 +148,18 @@ bool CArena::Start() {
 	}
 }
 
+bool CArena::Stop() {
+	mRunning = false;
+	if (mNetwork) {
+		return mNetwork->Stop();
+	}
+	return true;
+}
+
 void CArena::Init_Simulation() {
 	mPython_Runtime = std::make_unique<CPython_Runtime>(mArgs.scripts_directory);
 
-	py::module_ env_module = py::module_::import("env");
-
-	env_module.attr("control") = py::cast(
-		this,
-		py::return_value_policy::reference
-	);
+	mPython_Runtime->Inject_API(*this);
 
 	if (!CPython_Runtime::Load_Script_List(mArgs.scripts_directory, mScript_List)) {
 		spdlog::error("Failed to load script list from directory: {}", mArgs.scripts_directory);
@@ -170,8 +180,7 @@ void CArena::Init_Simulation() {
 		auto fname = findScriptFilenameById(mArgs.controllers[team_index]).value_or("").string();
 
 		try {
-			auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index);
-			ctl.Initialize();
+			auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index, true);
 			spdlog::info("Loaded controller script: {} for team {}", fname, team_index);
 		}
 		catch (py::error_already_set& e) {
@@ -319,7 +328,9 @@ void CArena::Synchronize_Ball() {
 
 	// guard against the ball being outside the arena bounds, if outside, reset to center
 	if (mBall.x < 0.0f || mBall.x > mArgs.arena_width || mBall.y < 0.0f || mBall.y > mArgs.arena_height) {
-		spdlog::info("Ball out of bounds at {:.3f}, {:.3f}. Resetting to center.", mBall.x, mBall.y);
+		if (!mArgs.is_simulation) {
+			spdlog::info("Ball out of bounds at {:.3f}, {:.3f}. Resetting to center.", mBall.x, mBall.y);
+		}
 		Reset_Ball_Position();
 	}
 }
@@ -359,41 +370,64 @@ void CArena::On_Ball_Hit_Wall(b2ShapeId wallShape) {
 
 	if (B2_ID_EQUALS(wallShape, mWalls.left)) {
 		if (mBall.y >= (mArgs.arena_height - mArgs.goal_width) * 0.5f && mBall.y <= (mArgs.arena_height + mArgs.goal_width) * 0.5f) {
-			spdlog::info("Goal scored LEFT!");
-			Reset_Ball_Position();
+			// TODO: hardcoded team index for now, until we agree upon the definition of teams and starting positions
+			mTeam_Scores[1]++;
+
+			spdlog::info("[{}] Ball in team 0 goal! Score: {}:{}", mId, mTeam_Scores[0], mTeam_Scores.size() > 0 ? mTeam_Scores[1] : 0);
+
+			if (!Check_Win()) {
+				Reset_Ball_Position();
+			}
 		}
 	}
 	else if (B2_ID_EQUALS(wallShape, mWalls.right)) {
 		if (mBall.y >= (mArgs.arena_height - mArgs.goal_width) * 0.5f && mBall.y <= (mArgs.arena_height + mArgs.goal_width) * 0.5f) {
-			spdlog::info("Goal scored RIGHT!");
-			Reset_Ball_Position();
+
+			// TODO: hardcoded team index for now, until we agree upon the definition of teams and starting positions
+			mTeam_Scores[0]++;
+
+			spdlog::info("[{}] Ball in team 1 goal! Score: {}:{}", mId, mTeam_Scores[0], mTeam_Scores.size() > 0 ? mTeam_Scores[1] : 0);
+
+			if (!Check_Win()) {
+				Reset_Ball_Position();
+			}
 		}
 	}
 
 }
 
+bool CArena::Check_Win() {
+	if (!mArgs.is_simulation) {
+		return false;
+	}
+
+	for (size_t i = 0; i < mTeam_Scores.size(); i++) {
+		if (mTeam_Scores[i] >= mArgs.win_points) {
+			spdlog::info("Team {} wins!", i);
+			mRunning = false;
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void CArena::Process_Ball_Contact_Events() {
-	const b2ContactEvents events =
-		b2World_GetContactEvents(mWorld_Id);
 
-	for (int i = 0; i < events.beginCount; ++i)
-	{
-		const b2ContactBeginTouchEvent& event =
-			events.beginEvents[i];
+	const b2ContactEvents events = b2World_GetContactEvents(mWorld_Id);
 
-		const bool ballIsA =
-			B2_ID_EQUALS(event.shapeIdA, mBall.shape_id);
+	for (int i = 0; i < events.beginCount; ++i) {
 
-		const bool ballIsB =
-			B2_ID_EQUALS(event.shapeIdB, mBall.shape_id);
+		const b2ContactBeginTouchEvent& event = events.beginEvents[i];
 
-		if (!ballIsA && !ballIsB)
+		const bool ballIsA = B2_ID_EQUALS(event.shapeIdA, mBall.shape_id);
+		const bool ballIsB = B2_ID_EQUALS(event.shapeIdB, mBall.shape_id);
+
+		if (!ballIsA && !ballIsB) {
 			continue;
+		}
 
-		const b2ShapeId otherShape =
-			ballIsA
-			? event.shapeIdB
-			: event.shapeIdA;
+		const b2ShapeId otherShape = ballIsA ? event.shapeIdB : event.shapeIdA;
 
 		if (Is_Arena_Wall(otherShape)) {
 			On_Ball_Hit_Wall(otherShape);
@@ -403,20 +437,26 @@ void CArena::Process_Ball_Contact_Events() {
 
 int CArena::Run() {
 	// Main loop for the arena simulation
-	while (true) {
-		Update_Robot_Positions(0.01f);
+	while (mRunning) {
+		Update_Robot_Positions(mPhysics_Step_Duration_Frac);
 		Synchronize_Ball();
 
 		if (!mArgs.is_simulation) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			std::this_thread::sleep_for(mPhysics_Step_Duration);
 		}
 		else {
 			if (mPython_Runtime) {
-				mPython_Runtime->Update_All();
+				try {
+					// Update all scripts
+					mPython_Runtime->Update_All();
+				}
+				catch (py::error_already_set& e) {
+					spdlog::error("Python error during update: {}", e.what());
+				}
 			}
 		}
 
-		mCurrent_Time_Ms += 10;
+		mCurrent_Time_Ms += mArgs.resolution_ms;
 	}
 	return 0;
 }
@@ -442,21 +482,22 @@ void CArena::Update_Robot_Positions(float delta_time) {
 }
 
 void CArena::On_Speed_Set(uint16_t robot_idx, uint16_t team_idx, float left, float right) {
-	for (auto& robot : mRobots) {
-		if (robot.robot_idx == robot_idx && robot.team_idx == team_idx) {
-			// Update the robot's wheel speeds
-			robot.left_wheel_speed = left;
-			robot.right_wheel_speed = right;
 
-			// assume a simple differential drive model to update speed_x and speed_y based on wheel speeds
-			robot.speed_forward = (left + right) / 2.0f; // average of left and right wheel speeds
-			robot.speed_angular = (right - left) / 0.5f; // simple differential drive model, wheel_base = 0.5
-
-			Apply_Robot_Command(robot);
-
-			break; // Exit loop after updating the correct robot
-		}
+	auto robotGlobalIdx = team_idx * mArgs.robots_per_team + robot_idx;
+	if (robotGlobalIdx >= mRobots.size()) {
+		spdlog::warn("Invalid robot index: team {} robot {}", team_idx, robot_idx);
+		return;
 	}
+
+	auto& robot = mRobots[robotGlobalIdx];
+
+	// Update the robot's wheel speeds
+	robot.left_wheel_speed = left;
+	robot.right_wheel_speed = right;
+
+	// assume a simple differential drive model to update speed_x and speed_y based on wheel speeds
+	robot.speed_forward = (left + right) / 2.0f; // average of left and right wheel speeds
+	robot.speed_angular = (right - left) / 0.5f; // simple differential drive model, wheel_base = 0.5
 }
 
 void CArena::On_Refresh_Positions_Request(const TWaiting_For_Positions& request) {
@@ -497,13 +538,20 @@ void CArena::On_Ball_Position_Request(const TWaiting_For_Any& request) {
 }
 
 int CArena::Get_Robot_Count(size_t team_index) const {
+
+	// for now, we assume that each team has the same number of robots as specified in mArgs.robots_per_team
+	/*
 	int cnt = 0;
 	for (const auto& robot : mRobots) {
 		if (robot.team_idx == team_index) {
 			cnt++;
 		}
 	}
+
 	return cnt;
+	*/
+
+	return mArgs.robots_per_team;
 }
 
 void CArena::Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id) {
@@ -520,21 +568,15 @@ void CArena::Set_Robot_Script(size_t team_index, size_t robot_index, const std::
 	}
 
 	try {
-		int targetIdx = -1;
-		for (size_t i = 0; i < mRobots.size(); ++i) {
-			if (mRobots[i].robot_idx == static_cast<int>(robot_index) && mRobots[i].team_idx == static_cast<int>(team_index)) {
-				targetIdx = static_cast<int>(i);
-				break;
-			}
-		}
-
-		if (targetIdx == -1) {
+		auto targetIdx = team_index * mArgs.robots_per_team + robot_index;
+		if (targetIdx >= mRobots.size()) {
+			spdlog::warn("Invalid robot index: team {} robot {}", team_index, robot_index);
 			return;
 		}
 
 		mRobots[targetIdx].scriptName = it->name;
 
-		mPython_Runtime->Create_Agent_Script(it->path.filename().stem().string(), static_cast<uint16_t>(team_index), static_cast<uint16_t>(robot_index)).Initialize();
+		mPython_Runtime->Create_Agent_Script(it->path.filename().stem().string(), static_cast<uint16_t>(team_index), static_cast<uint16_t>(robot_index), true);
 	}
 	catch (py::error_already_set& e) {
 		spdlog::error("Python: {}", e.what());
@@ -551,13 +593,14 @@ void CArena::Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_
 }
 
 py::tuple CArena::Get_Robot_Position(size_t team_index, size_t robot_index) const {
-	for (const auto& robot : mRobots) {
-		if (robot.team_idx == team_index && robot.robot_idx == robot_index) {
-			return py::make_tuple(robot.x, robot.y, robot.orientation);
-		}
+	auto robotGlobalIdx = team_index * mArgs.robots_per_team + robot_index;
+	if (robotGlobalIdx >= mRobots.size()) {
+		return py::make_tuple(0.0f, 0.0f, 0.0f); // Return a default value if the robot index is out of bounds
 	}
 
-	return py::make_tuple(0.0f, 0.0f, 0.0f); // Return a default value if the robot is not found
+	const auto& robot = mRobots[robotGlobalIdx];
+
+	return py::make_tuple(robot.x, robot.y, robot.orientation);
 }
 
 py::tuple CArena::Get_Ball_Position() const {
@@ -565,7 +608,7 @@ py::tuple CArena::Get_Ball_Position() const {
 }
 
 
-PYBIND11_EMBEDDED_MODULE(env, m)
+PYBIND11_EMBEDDED_MODULE(env, m, py::multiple_interpreters::per_interpreter_gil())
 {
 	py::class_<CArena>(m, "env")
 		.def(
