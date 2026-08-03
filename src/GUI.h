@@ -29,12 +29,6 @@ constexpr auto Highlight_Color = IM_COL32(224, 177, 0, 255);
 
 extern std::vector<ImVec4> gTeam_Colors;
 
-enum class NScript_Type {
-	None,
-	Agent,
-	Controller
-};
-
 struct GLFWwindow;
 
 struct TRobot_Cached_Info {
@@ -104,13 +98,6 @@ class CStudio_GUI : public CPython_UWBSOT_API {
 
 		void* mCamera_Buffer = nullptr;
 		TImGui_Texture mCamera_Texture;
-
-		struct TScript_Entry {
-			std::string id;
-			std::string name;
-			NScript_Type type;
-			std::filesystem::path path;
-		};
 
 		std::vector<TScript_Entry> mScript_List;
 

@@ -14,6 +14,19 @@
 
 namespace py = pybind11;
 
+enum class NScript_Type {
+	None,
+	Agent,
+	Controller
+};
+
+struct TScript_Entry {
+	std::string id;
+	std::string name;
+	NScript_Type type;
+	std::filesystem::path path;
+};
+
 /**
  * CPython_UWBSOT_API is an abstract interface that defines the methods for interacting with the Python scripts in the UWB SOT environment
  */
@@ -82,6 +95,8 @@ class CPython_Runtime {
 
 		void Initialize_All();
 		void Update_All();
+
+		static bool Load_Script_List(const std::filesystem::path& scriptsDirectory, std::vector<TScript_Entry>& outScriptList);
 
 	protected:
 		/**

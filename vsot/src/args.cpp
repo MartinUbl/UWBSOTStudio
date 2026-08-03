@@ -1,6 +1,87 @@
 #include "args.h"
 #include <iostream>
 #include <stdexcept>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+
+namespace {
+
+	bool Load_Simulation_Config(const std::string& path, TCLI_Args& args) {
+		// config format:
+
+/*
+runs=10
+
+win-points=10
+
+teams=2
+robots=6
+
+controllers[0]=ctl-mixed
+controllers[1]=ctl-mixed
+*/
+
+		// Read the file
+		std::ifstream file(path);
+		if (!file.is_open()) {
+			std::cerr << "Failed to open simulation config file: " << path << std::endl;
+			return false;
+		}
+
+		std::string line;
+		while (std::getline(file, line)) {
+			// Remove whitespace
+			line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
+			// Skip empty lines and comments
+			if (line.empty() || line[0] == '#') {
+				continue;
+			}
+			auto delimiter_pos = line.find('=');
+			if (delimiter_pos == std::string::npos) {
+				std::cerr << "Invalid line in config: " << line << std::endl;
+				continue;
+			}
+			std::string key = line.substr(0, delimiter_pos);
+			std::string value = line.substr(delimiter_pos + 1);
+			if (key == "runs") {
+				args.runs = std::stoi(value);
+			}
+			else if (key == "win-points") {
+				args.win_points = std::stoi(value);
+			}
+			else if (key == "teams") {
+				args.teams = std::stoi(value);
+			}
+			else if (key == "robots") {
+				args.robots_per_team = std::stoi(value);
+			}
+			else if (key == "scripts-directory") {
+				args.scripts_directory = value;
+			}
+			else if (key.find("controllers[") == 0) {
+				// Extract the index
+				size_t start = key.find('[') + 1;
+				size_t end = key.find(']');
+				if (start != std::string::npos && end != std::string::npos && end > start) {
+					int index = std::stoi(key.substr(start, end - start));
+					if (index >= args.controllers.size()) {
+						args.controllers.resize(index + 1);
+					}
+					args.controllers[index] = value;
+				}
+				else {
+					std::cerr << "Invalid controller key in config: " << key << std::endl;
+				}
+			}
+			else {
+				std::cerr << "Unknown key in config: " << key << std::endl;
+			}
+		}
+		return true;
+	}
+
+}
 
 TCLI_Args Parse_Args(int argc, char** argv) {
 	TCLI_Args args;
@@ -66,8 +147,23 @@ TCLI_Args Parse_Args(int argc, char** argv) {
 				throw std::invalid_argument("Missing value for --listen-port");
 			}
 		}
+		else if (arg == "--simulation-config" || arg == "-s") {
+			if (i + 1 < argc) {
+				args.simulation_config = argv[++i];
+				args.is_simulation = true;
+			}
+			else {
+				throw std::invalid_argument("Missing value for --simulation-config");
+			}
+		}
 		else {
 			throw std::invalid_argument("Unknown argument: " + arg);
+		}
+	}
+
+	if (args.is_simulation) {
+		if (!Load_Simulation_Config(args.simulation_config, args)) {
+			throw std::invalid_argument("Failed to load simulation config: " + args.simulation_config);
 		}
 	}
 

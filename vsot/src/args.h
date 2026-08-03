@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 struct TCLI_Args {
 	// --help
@@ -23,6 +24,18 @@ struct TCLI_Args {
 	std::string host = "localhost";
 	// --listen-port <int>, or -p <int>
 	int port = 3320;
+
+	// --simulation-config <string> or -s <string>
+	std::string simulation_config;
+
+
+
+	// the following parameters will be loaded from the simulation config, if provided
+	bool is_simulation = false;
+	int runs = 0;
+	int win_points = 0;
+	std::vector<std::string> controllers;
+	std::string scripts_directory;
 };
 
 /**

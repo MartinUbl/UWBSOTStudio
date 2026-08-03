@@ -10,6 +10,9 @@
 #include <box2d/box2d.h>
 #include <uwbsot/PluginInterface.h>
 
+#include <pybind11/embed.h>
+#include <uwbsot-python/Runtime.h>
+
 struct TArena_Robot {
 	uint16_t robot_idx;
 	uint16_t team_idx;
@@ -23,6 +26,7 @@ struct TArena_Robot {
 	float right_wheel_speed; // cached
 
 	b2BodyId body_id = b2_nullBodyId;
+	std::string scriptName;
 };
 
 struct TArena_Ball {
@@ -44,7 +48,7 @@ struct TArena_Walls {
 	b2ShapeId right = b2_nullShapeId;
 };
 
-class CArena {
+class CArena : public CPython_UWBSOT_API {
 	private:
 		TCLI_Args mArgs;
 
@@ -55,6 +59,11 @@ class CArena {
 
 		TArena_Walls mWalls;
 		TArena_Ball mBall;
+
+		long long mCurrent_Time_Ms = 0;
+
+		std::unique_ptr<CPython_Runtime> mPython_Runtime;
+		std::vector<TScript_Entry> mScript_List;
 
 	protected:
 		void Create_Ball();
@@ -71,6 +80,17 @@ class CArena {
 		void On_Ball_Hit_Wall(b2ShapeId wallShape);
 
 		void Reset_Ball_Position();
+
+	protected:
+		void Init_Simulation();
+
+	public: // pybind API
+		int Get_Robot_Count(size_t team_index) const override;
+		void Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id) override;
+		long long Get_Elapsed_Time_Milliseconds() const override;
+		void Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right) override;
+		py::tuple Get_Robot_Position(size_t team_index, size_t robot_index) const override;
+		py::tuple Get_Ball_Position() const override;
 
 	public:
 		CArena(const TCLI_Args& args);

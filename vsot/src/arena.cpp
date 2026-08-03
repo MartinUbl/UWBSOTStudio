@@ -9,7 +9,9 @@
 #include <spdlog/spdlog.h>
 
 CArena::CArena(const TCLI_Args& args) : mArgs(args) {
-	mNetwork = std::make_unique<CNetwork>(args);
+	if (!mArgs.is_simulation) {
+		mNetwork = std::make_unique<CNetwork>(args);
+	}
 }
 
 bool CArena::Start() {
@@ -120,14 +122,62 @@ bool CArena::Start() {
 
 	Create_Ball();
 
-	mNetwork->Set_Callbacks({
-		std::bind(&CArena::On_Speed_Set, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4),
-		std::bind(&CArena::On_Refresh_Positions_Request, this, std::placeholders::_1),
-		std::bind(&CArena::On_Metadata_Request, this, std::placeholders::_1),
-		std::bind(&CArena::On_Ball_Position_Request, this, std::placeholders::_1)
-	});
+	if (!mArgs.is_simulation) {
+		mNetwork->Set_Callbacks({
+			std::bind(&CArena::On_Speed_Set, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4),
+			std::bind(&CArena::On_Refresh_Positions_Request, this, std::placeholders::_1),
+			std::bind(&CArena::On_Metadata_Request, this, std::placeholders::_1),
+			std::bind(&CArena::On_Ball_Position_Request, this, std::placeholders::_1)
+			});
 
-	return mNetwork->Start();
+		return mNetwork->Start();
+	}
+	else {
+		Init_Simulation();
+
+		spdlog::info("Simulation mode started");
+
+		return true;
+	}
+}
+
+void CArena::Init_Simulation() {
+	mPython_Runtime = std::make_unique<CPython_Runtime>(mArgs.scripts_directory);
+
+	py::module_ env_module = py::module_::import("env");
+
+	env_module.attr("control") = py::cast(
+		this,
+		py::return_value_policy::reference
+	);
+
+	if (!CPython_Runtime::Load_Script_List(mArgs.scripts_directory, mScript_List)) {
+		spdlog::error("Failed to load script list from directory: {}", mArgs.scripts_directory);
+		return;
+	}
+
+	auto findScriptFilenameById = [this](const std::string& script_id) -> std::optional<std::filesystem::path> {
+		for (const auto& script : mScript_List) {
+			if (script.id == script_id) {
+				return script.path.filename().stem();
+			}
+		}
+		return std::nullopt;
+	};
+
+	for (int team_index = 0; team_index < mArgs.teams; team_index++) {
+
+		auto fname = findScriptFilenameById(mArgs.controllers[team_index]).value_or("").string();
+
+		try {
+			auto& ctl = mPython_Runtime->Create_Controller_Script(fname, team_index);
+			ctl.Initialize();
+			spdlog::info("Loaded controller script: {} for team {}", fname, team_index);
+		}
+		catch (py::error_already_set& e) {
+			spdlog::error("Python error: {}", e.what());
+		}
+	}
 }
 
 void CArena::Create_Ball() {
@@ -356,7 +406,17 @@ int CArena::Run() {
 	while (true) {
 		Update_Robot_Positions(0.01f);
 		Synchronize_Ball();
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+		if (!mArgs.is_simulation) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		else {
+			if (mPython_Runtime) {
+				mPython_Runtime->Update_All();
+			}
+		}
+
+		mCurrent_Time_Ms += 10;
 	}
 	return 0;
 }
@@ -434,4 +494,110 @@ void CArena::On_Metadata_Request(const TWaiting_For_Any& request) {
 
 void CArena::On_Ball_Position_Request(const TWaiting_For_Any& request) {
 	mNetwork->Send_Ball_Position_Response(request, static_cast<uint16_t>(mBall.state), mBall.x, mBall.y, mBall.radius);
+}
+
+int CArena::Get_Robot_Count(size_t team_index) const {
+	int cnt = 0;
+	for (const auto& robot : mRobots) {
+		if (robot.team_idx == team_index) {
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
+void CArena::Set_Robot_Script(size_t team_index, size_t robot_index, const std::string& script_id) {
+	if (robot_index >= mRobots.size()) {
+		return;
+	}
+
+	auto it = std::find_if(mScript_List.begin(), mScript_List.end(), [&](const TScript_Entry& script) {
+		return script.id == script_id;
+	});
+
+	if (it == mScript_List.end()) {
+		return;
+	}
+
+	try {
+		int targetIdx = -1;
+		for (size_t i = 0; i < mRobots.size(); ++i) {
+			if (mRobots[i].robot_idx == static_cast<int>(robot_index) && mRobots[i].team_idx == static_cast<int>(team_index)) {
+				targetIdx = static_cast<int>(i);
+				break;
+			}
+		}
+
+		if (targetIdx == -1) {
+			return;
+		}
+
+		mRobots[targetIdx].scriptName = it->name;
+
+		mPython_Runtime->Create_Agent_Script(it->path.filename().stem().string(), static_cast<uint16_t>(team_index), static_cast<uint16_t>(robot_index)).Initialize();
+	}
+	catch (py::error_already_set& e) {
+		spdlog::error("Python: {}", e.what());
+		return;
+	}
+}
+
+long long CArena::Get_Elapsed_Time_Milliseconds() const {
+	return mCurrent_Time_Ms;
+}
+
+void CArena::Set_Robot_Speed(size_t team_index, size_t robot_index, float speed_left, float speed_right) {
+	On_Speed_Set(static_cast<uint16_t>(robot_index), static_cast<uint16_t>(team_index), speed_left, speed_right);
+}
+
+py::tuple CArena::Get_Robot_Position(size_t team_index, size_t robot_index) const {
+	for (const auto& robot : mRobots) {
+		if (robot.team_idx == team_index && robot.robot_idx == robot_index) {
+			return py::make_tuple(robot.x, robot.y, robot.orientation);
+		}
+	}
+
+	return py::make_tuple(0.0f, 0.0f, 0.0f); // Return a default value if the robot is not found
+}
+
+py::tuple CArena::Get_Ball_Position() const {
+	return py::make_tuple(mBall.x, mBall.y, mBall.radius);
+}
+
+
+PYBIND11_EMBEDDED_MODULE(env, m)
+{
+	py::class_<CArena>(m, "env")
+		.def(
+			"get_robot_count",
+			&CArena::Get_Robot_Count,
+			py::arg("team_index")
+		)
+		.def(
+			"set_robot_script",
+			&CArena::Set_Robot_Script,
+			py::arg("team_index"),
+			py::arg("robot_index"),
+			py::arg("script_id")
+		)
+		.def(
+			"get_time_ms",
+			&CArena::Get_Elapsed_Time_Milliseconds
+		)
+		.def(
+			"set_robot_speed",
+			&CArena::Set_Robot_Speed,
+			py::arg("team_index"),
+			py::arg("robot_index"),
+			py::arg("speed_left"),
+			py::arg("speed_right")
+		)
+		.def("get_robot_position",
+			&CArena::Get_Robot_Position,
+			py::arg("team_index"),
+			py::arg("robot_index")
+		)
+		.def("get_ball_position",
+			&CArena::Get_Ball_Position
+		);
 }
