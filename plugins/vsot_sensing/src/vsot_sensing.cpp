@@ -86,6 +86,11 @@ bool CVSOT_Sensing_Plugin::Send_Empty_Request(CPacket& response, vsot::NOpcode o
 		return false;
 	}
 
+	if (buffer.size() < sizeof(vsot::TMessage_Header)) {
+		std::cerr << "Received metadata response is too short\n";
+		return false;
+	}
+
 	response.assign(buffer);
 
 	return true;

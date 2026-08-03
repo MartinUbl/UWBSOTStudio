@@ -80,7 +80,7 @@ void CNetwork::Set_Callbacks(const TCallbacks& callbacks) {
 void CNetwork::Thread_Fnc() {
 
 	int res = 0;
-	std::vector<char> buffer(65536); // 64KB buffer for incoming messages
+	std::vector<char> buffer(1024); // 1KB buffer for incoming messages
 	sockaddr_in src_addr{};
 	socklen_t src_addr_len = sizeof(src_addr);
 

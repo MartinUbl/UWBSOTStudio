@@ -12,6 +12,7 @@ CArena::CArena(const TCLI_Args& args, size_t id)
 	: mArgs(args), mId(id), mRunning{ false },
 	  mPhysics_Step_Duration(std::chrono::milliseconds(args.resolution_ms)),
 	  mPhysics_Step_Duration_Frac(static_cast<float>(args.resolution_ms) / 1000.0f) {
+
 	if (!mArgs.is_simulation) {
 		mNetwork = std::make_unique<CNetwork>(args);
 	}
@@ -26,7 +27,7 @@ bool CArena::Start() {
 	mWorld_Id = b2CreateWorld(&worldDef);
 
 	constexpr float wallThickness = 0.1f;
-	const float halfWall = wallThickness * 0.5f;
+	constexpr float halfWall = wallThickness * 0.5f;
 
 	b2BodyDef bodyDef = b2DefaultBodyDef();
 	bodyDef.type = b2_staticBody;
@@ -42,41 +43,20 @@ bool CArena::Start() {
 	const b2Rot noRotation = b2MakeRot(0.0f);
 
 	// Bottom wall: just below y = 0
-	b2Polygon bottomWall = b2MakeOffsetBox(
-		mArgs.arena_width * 0.5f + wallThickness,
-		halfWall,
-		b2Vec2(mArgs.arena_width * 0.5f, -halfWall),
-		noRotation
-	);
+	b2Polygon bottomWall = b2MakeOffsetBox(mArgs.arena_width * 0.5f + wallThickness, halfWall, b2Vec2(mArgs.arena_width * 0.5f, -halfWall), noRotation);
 	mWalls.bottom = b2CreatePolygonShape(arenaBody, &shapeDef, &bottomWall);
 
 	// Top wall: just above y = mArena_Height
-	b2Polygon topWall = b2MakeOffsetBox(
-		mArgs.arena_width * 0.5f + wallThickness,
-		halfWall,
-		b2Vec2(mArgs.arena_width * 0.5f, mArgs.arena_height + halfWall),
-		noRotation
-	);
+	b2Polygon topWall = b2MakeOffsetBox(mArgs.arena_width * 0.5f + wallThickness, halfWall, b2Vec2(mArgs.arena_width * 0.5f, mArgs.arena_height + halfWall), noRotation);
 	mWalls.top = b2CreatePolygonShape(arenaBody, &shapeDef, &topWall);
 
 	// Left wall: just left of x = 0
-	b2Polygon leftWall = b2MakeOffsetBox(
-		halfWall,
-		mArgs.arena_height * 0.5f,
-		b2Vec2(-halfWall, mArgs.arena_height * 0.5f),
-		noRotation
-	);
+	b2Polygon leftWall = b2MakeOffsetBox(halfWall, mArgs.arena_height * 0.5f, b2Vec2(-halfWall, mArgs.arena_height * 0.5f), noRotation);
 	mWalls.left = b2CreatePolygonShape(arenaBody, &shapeDef, &leftWall);
 
 	// Right wall: just right of x = mArena_Width
-	b2Polygon rightWall = b2MakeOffsetBox(
-		halfWall,
-		mArgs.arena_height * 0.5f,
-		b2Vec2(mArgs.arena_width + halfWall, mArgs.arena_height * 0.5f),
-		noRotation
-	);
+	b2Polygon rightWall = b2MakeOffsetBox(halfWall, mArgs.arena_height * 0.5f, b2Vec2(mArgs.arena_width + halfWall, mArgs.arena_height * 0.5f), noRotation);
 	mWalls.right = b2CreatePolygonShape(arenaBody, &shapeDef, &rightWall);
-
 
 	float cursor_x = 15.0f;
 	float cursor_y = 0.0f;
@@ -190,8 +170,9 @@ void CArena::Init_Simulation() {
 }
 
 void CArena::Create_Ball() {
-	if (mBall.radius <= 0.0f)
+	if (mBall.radius <= 0.0f) {
 		throw std::invalid_argument("Ball radius must be positive");
+	}
 
 	b2BodyDef bodyDef = b2DefaultBodyDef();
 
@@ -205,9 +186,6 @@ void CArena::Create_Ball() {
 	// Helps prevent a small, fast ball from passing through thin objects.
 	bodyDef.isBullet = true;
 
-	// Circular objects may rotate quickly.
-	bodyDef.allowFastRotation = true;
-
 	// Keep it available for collisions immediately.
 	bodyDef.enableSleep = true;
 
@@ -215,19 +193,8 @@ void CArena::Create_Ball() {
 
 	b2ShapeDef shapeDef = b2DefaultShapeDef();
 
-	/*
-	 * Box2D density is kg/m² in a metrically scaled simulation.
-	 *
-	 * A table-tennis ball has a mass of roughly 0.0027 kg. Since Box2D is 2D,
-	 * choose density so that:
-	 *
-	 *     mass = density * pi * radius²
-	 */
 	constexpr float desiredMass = 0.0027f;
-
-	shapeDef.density =
-		desiredMass /
-		(std::numbers::pi * mBall.radius * mBall.radius);
+	shapeDef.density = desiredMass / (std::numbers::pi * mBall.radius * mBall.radius);
 
 	// Low surface friction: the ball should not stick to robots or walls.
 	shapeDef.material.friction = 0.12f;
@@ -242,11 +209,7 @@ void CArena::Create_Ball() {
 	circle.center = b2Vec2(0.0f, 0.0f);
 	circle.radius = mBall.radius;
 
-	mBall.shape_id = b2CreateCircleShape(
-		mBall.body_id,
-		&shapeDef,
-		&circle
-	);
+	mBall.shape_id = b2CreateCircleShape(mBall.body_id, &shapeDef, &circle);
 }
 
 void CArena::Create_Robot_Body(TArena_Robot& robot) {
@@ -278,33 +241,21 @@ void CArena::Create_Robot_Body(TArena_Robot& robot) {
 	shapeDef.material.friction = 0.5f;
 	shapeDef.material.restitution = 0.1f;
 
-	// b2MakeBox takes half-extents.
-	//
-	// Local X axis = forward direction.
-	// Local Y axis = robot's lateral direction.
-	const b2Polygon robotShape = b2MakeBox(
-		Robot_Size * 0.5f,
-		Robot_Size * 0.5f
-	);
+	const b2Polygon robotShape = b2MakeBox(Robot_Size * 0.5f, Robot_Size * 0.5f);
 
-	b2CreatePolygonShape(
-		robot.body_id,
-		&shapeDef,
-		&robotShape
-	);
+	b2CreatePolygonShape(robot.body_id, &shapeDef, &robotShape);
 
 	Apply_Robot_Command(robot);
 }
 
 void CArena::Apply_Robot_Command(TArena_Robot& robot)
 {
-	if (!b2Body_IsValid(robot.body_id))
+	if (!b2Body_IsValid(robot.body_id)) {
 		return;
+	}
 
-	constexpr const float Speed_Multiplier = 100.0f; // Adjust this multiplier to control the speed of the robots
+	constexpr const float Speed_Multiplier = 100.0f; // arbitrary scaling factor to convert speed units to Box2D units
 
-	// Read the actual orientation from Box2D. It may have changed because
-	// of a collision since the previous simulation step.
 	const b2Rot rotation = b2Body_GetRotation(robot.body_id);
 	const float angle = b2Rot_GetAngle(rotation);
 
@@ -318,8 +269,10 @@ void CArena::Apply_Robot_Command(TArena_Robot& robot)
 }
 
 void CArena::Synchronize_Ball() {
-	if (!b2Body_IsValid(mBall.body_id))
+
+	if (!b2Body_IsValid(mBall.body_id)) {
 		return;
+	}
 
 	const b2Vec2 position = b2Body_GetPosition(mBall.body_id);
 
@@ -342,28 +295,21 @@ void CArena::Reset_Ball_Position() {
 	b2Body_SetLinearVelocity(mBall.body_id, b2Vec2(0.0f, 0.0f));
 }
 
-void CArena::Synchronize_Robot_State(TArena_Robot& robot)
-{
-	if (!b2Body_IsValid(robot.body_id))
+void CArena::Synchronize_Robot_State(TArena_Robot& robot) {
+	if (!b2Body_IsValid(robot.body_id)) {
 		return;
+	}
 
-	const b2Vec2 position =
-		b2Body_GetPosition(robot.body_id);
-
-	const b2Rot rotation =
-		b2Body_GetRotation(robot.body_id);
+	const b2Vec2 position = b2Body_GetPosition(robot.body_id);
+	const b2Rot rotation = b2Body_GetRotation(robot.body_id);
 
 	robot.x = position.x;
 	robot.y = position.y;
 	robot.orientation = b2Rot_GetAngle(rotation);
 }
 
-bool CArena::Is_Arena_Wall(b2ShapeId shapeId)
-{
-	return B2_ID_EQUALS(shapeId, mWalls.bottom) ||
-		B2_ID_EQUALS(shapeId, mWalls.top) ||
-		B2_ID_EQUALS(shapeId, mWalls.left) ||
-		B2_ID_EQUALS(shapeId, mWalls.right);
+bool CArena::Is_Arena_Wall(b2ShapeId shapeId) {
+	return B2_ID_EQUALS(shapeId, mWalls.bottom) || B2_ID_EQUALS(shapeId, mWalls.top) || B2_ID_EQUALS(shapeId, mWalls.left) || B2_ID_EQUALS(shapeId, mWalls.right);
 }
 
 void CArena::On_Ball_Hit_Wall(b2ShapeId wallShape) {
@@ -463,22 +409,18 @@ int CArena::Run() {
 
 void CArena::Update_Robot_Positions(float delta_time) {
 
-	for (TArena_Robot& robot : mRobots)
+	for (TArena_Robot& robot : mRobots) {
 		Apply_Robot_Command(robot);
+	}
 
 	constexpr int subStepCount = 4;
-
-	b2World_Step(
-		mWorld_Id,
-		delta_time,
-		subStepCount
-	);
+	b2World_Step(mWorld_Id, delta_time, subStepCount);
 
 	Process_Ball_Contact_Events();
 
-	// Read the collision-resolved positions back from Box2D.
-	for (TArena_Robot& robot : mRobots)
+	for (TArena_Robot& robot : mRobots) {
 		Synchronize_Robot_State(robot);
+	}
 }
 
 void CArena::On_Speed_Set(uint16_t robot_idx, uint16_t team_idx, float left, float right) {

@@ -8,21 +8,6 @@
 namespace {
 
 	bool Load_Simulation_Config(const std::string& path, TCLI_Args& args) {
-		// config format:
-
-/*
-runs=10
-
-win-points=10
-
-teams=2
-robots=6
-
-controllers[0]=ctl-mixed
-controllers[1]=ctl-mixed
-*/
-
-		// Read the file
 		std::ifstream file(path);
 		if (!file.is_open()) {
 			std::cerr << "Failed to open simulation config file: " << path << std::endl;
