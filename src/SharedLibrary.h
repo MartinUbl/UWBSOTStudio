@@ -79,8 +79,11 @@ public:
 
 #if defined(_WIN32)
 		m_Handle = LoadLibraryW(path.wstring().c_str());
-		if (!m_Handle)
-			throw std::runtime_error("Failed to load library: " + path.string());
+		if (!m_Handle) {
+			// retrieve error code
+			DWORD errorCode = GetLastError();
+			throw std::runtime_error("Failed to load shared library: " + path.string() + ", error code: " + std::to_string(errorCode));
+		}
 #else
 		m_Handle = dlopen(path.string().c_str(), RTLD_NOW);
 		if (!m_Handle)

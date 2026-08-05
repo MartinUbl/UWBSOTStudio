@@ -1,0 +1,28 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.20)
+
+SET(PROJECT_NAME "table_sensing")
+
+SET(CMAKE_CXX_STANDARD 20)
+
+PROJECT(${PROJECT_NAME})
+
+SET(SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/")
+
+SET(PYLON_SDK_DIR "" CACHE PATH "Basler Pylon SDK include dir")
+SET(PYLON_SDK_CONFIG_DIR "${PYLON_SDK_DIR}/Development/CMake/pylon")
+
+FIND_PACKAGE(pylon CONFIG REQUIRED PATHS "${PYLON_SDK_CONFIG_DIR}")
+
+INCLUDE_DIRECTORIES("${SHARED_DIR}")
+
+FILE(GLOB_RECURSE src src/*.cpp src/*.hpp src/*.h src/*.c)
+FILE(GLOB_RECURSE src_shared "${SHARED_DIR}/uwbsot/*.cpp" "${SHARED_DIR}/uwbsot/*.hpp" "${SHARED_DIR}/uwbsot/*.h" "${SHARED_DIR}/uwbsot/*.c")
+
+SOURCE_GROUP(src FILES ${src})
+SOURCE_GROUP(shared FILES ${src_shared})
+
+ADD_LIBRARY(${PROJECT_NAME} SHARED ${src} ${src_shared})
+
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} PRIVATE pylon::pylon)
+
+CONFIGURE_PLUGIN(${PROJECT_NAME})

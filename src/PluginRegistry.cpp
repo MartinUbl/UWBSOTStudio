@@ -47,7 +47,7 @@ void CPlugin_Registry::Load_Plugins() {
 			}
 		}
 		catch (const std::exception& ex) {
-			// TODO
+			std::cerr << "Failed to load plugin from " << path << ": " << ex.what() << std::endl;
 		}
 	}
 }
