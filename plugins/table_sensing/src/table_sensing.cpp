@@ -19,14 +19,14 @@ NLib_Result CTable_Sensing_Plugin::Initialize(const char** config_parameters, co
 	Pylon::CDeviceInfo selectedCamera;
 	Pylon::IPylonDevice* pDevice = nullptr;
 
+	Pylon::DeviceInfoList_t devices;
+	Pylon::CTlFactory::GetInstance().EnumerateDevices(devices);
+	if (devices.size() == 0) {
+		return NLib_Result::Not_Found;
+	}
+
 	bool foundCamera = false;
 	if (!cameraIdentifier.empty()) {
-
-		Pylon::DeviceInfoList_t devices;
-		Pylon::CTlFactory::GetInstance().EnumerateDevices(devices);
-		if (devices.size() == 0) {
-			return NLib_Result::Not_Found;
-		}
 
 		for (const auto& device : devices) {
 			if (cameraIdentifier == device.GetFriendlyName().c_str() || cameraIdentifier == device.GetDeviceGUID().c_str() || cameraIdentifier == device.GetSerialNumber().c_str()) {
@@ -153,6 +153,10 @@ NLib_Result CTable_Sensing_Plugin::Get_Camera_Image(void* rgbaPixels, int* width
 	// set the width and height
 	*width = mock_cameraWidth;
 	*height = mock_cameraHeight;
+
+	if (!mCamera.IsOpen()) {
+		return NLib_Result::Illegal_State;
+	}
 
 	Pylon::CGrabResultPtr ptrGrabResult;
 	
